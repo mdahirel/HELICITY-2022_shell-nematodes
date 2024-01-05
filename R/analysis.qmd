@@ -30,7 +30,7 @@ points <- st_read(here("data","HELICITY22_sites_BELambert72_wGHSL.gpkg")) |>
   mutate(x=st_coordinates(geom)[,1],
          y=st_coordinates(geom)[,2]) |> 
   mutate(
-    SMOD_type =  case_when(SMOD ==30 ~ "3 - Urban Cluster",
+    SMOD_type =  case_when(SMOD ==30 ~ "3 - Urban Centre",
                       (SMOD >= 20 & SMOD < 30) ~ "2 - Intermediate",
                       (SMOD > 10 & SMOD < 20) ~ "1 - Rural",
                       SMOD == 10 ~ "0 - Water bodies",
@@ -124,85 +124,15 @@ preds <- emmeans(mod_SMOD,specs = ~ SMOD_type, type="response") |>
   as_tibble()
 ```
 
-
-
-
 # plot
 
 ```{r}
 ggplot(data) + 
-  geom_point(aes(SMOD_type,N_nema/N,size=N),position = position_jitter(width=0.3),col="darkgrey") + 
-  geom_pointrange(data = preds, aes(x=SMOD_type,y=prob,ymin=asymp.LCL,ymax=asymp.UCL),size=1,pch=21,fill="white") 
+  geom_point(aes(SMOD_type,N_nema/N,size=N),position = position_jitter(width=0.3,height=0),col="darkgrey") + 
+  geom_pointrange(data = preds, aes(x=SMOD_type,y=prob,ymin=asymp.LCL,ymax=asymp.UCL),size=1,pch=21,fill="white")+ 
   scale_size_area("Number of snails") + 
-  labs(x="Urbanisation type (SMOD, 1km grid)", y = "Proportion of shells with nematodes")+
+  labs(x="Degree of Urbanisation (GHS-SMOD, 1km grid cell)", y = "Proportion of shells with nematodes")+
   theme_bw()
 ```
 
-# cross validating - ish
-
-```{r}
-mod_SMOD_noLeuven <- glm(cbind(N_nema,N-N_nema)~SMOD_type,
-                 data=filter(data,City!="Leuven"),
-                 family=binomial)
-
-mod_SMOD_noGhent <- glm(cbind(N_nema,N-N_nema)~SMOD_type,
-                 data=filter(data,City!="Ghent"),
-                 family=binomial)
-
-mod_SMOD_noBrussels <- glm(cbind(N_nema,N-N_nema)~SMOD_type,
-                 data=filter(data,City!="Brussels"),
-                 family=binomial)
-
-preds_full <- emmeans(mod_SMOD,specs = ~ SMOD_type, type="response") |> 
-  as_tibble() |> 
-  mutate(dataset = "full dataset")
-
-preds_noLeuven <- emmeans(mod_SMOD_noLeuven,specs = ~ SMOD_type, type="response") |> 
-  as_tibble() |> 
-  mutate(dataset = "minus Leuven")
-
-preds_noGhent <- emmeans(mod_SMOD_noGhent,specs = ~ SMOD_type, type="response") |> 
-  as_tibble() |> 
-  mutate(dataset = "minus Ghent")
-
-preds_noBrussels <- emmeans(mod_SMOD_noBrussels,specs = ~ SMOD_type, type="response") |> 
-  as_tibble() |> 
-  mutate(dataset = "minus Brussels")
-
-rbind(preds_full,preds_noLeuven,preds_noGhent,preds_noBrussels) |> 
-ggplot() + 
-  geom_pointrange(aes(x=SMOD_type,y=prob,ymin=asymp.LCL,ymax=asymp.UCL,fill=dataset),size=1,pch=21,position=position_dodge(width=0.5))+
-  labs(x="Urbanisation type (SMOD, 1km grid)", y = "Proportion of shells with nematodes (model prediction and CI95%)")+
-  theme_bw()
-
-```
-
-# intensity (ish, number of nematodes in shells containing nematodes)
-
-```{r}
-library(lme4)
-library(glmmTMB)
-
-infected <- nematodes |> 
-  filter(Nematodes > 0) |> 
-  left_join(points) |> 
-  mutate(Nematodes_minus_1 = Nematodes - 1)  # so the test variable stays bounded at 0
-
-mod=glmer(Nematodes_minus_1 ~ SMOD_type + (1|Population),data=infected, family=poisson)
-# convergence issue, let's use glmmTMB
-mod=glmmTMB(Nematodes_minus_1 ~ SMOD_type + (1|Population),data=infected, family=poisson)
-plot(simulateResiduals(mod))
-Anova(mod)
-
-
-preds_infected <- emmeans(mod,specs = ~ SMOD_type, type="response") |> 
-  as_tibble()
-
-ggplot(infected) + 
-  geom_point(aes(SMOD_type,Nematodes),position = position_jitter(width=0.3),col="darkgrey") + 
-  geom_pointrange(data = preds_infected, aes(x=SMOD_type,y=rate + 1,ymin=asymp.LCL + 1,ymax=asymp.UCL + 1),size=1,pch=21,fill="white") +
-  labs(x="Urbanisation type (SMOD, 1km grid)", y = "Number of nematodes per shell containing nematodes")+
-  scale_y_log10()+
-  theme_bw()
-```
 
