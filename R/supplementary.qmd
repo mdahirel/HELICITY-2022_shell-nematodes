@@ -11,9 +11,8 @@ editor_options:
 library(sf)
 library(car)
 library(emmeans)
-library(lme4)
+library(glmmTMB)
 library(DHARMa)
-library(MuMIn)
 library(tidyverse)
 
 library(here)
@@ -48,79 +47,7 @@ data <- nematodes |>
   st_as_sf()
 ```
 
-# S1: correlations between urbanisation metrics (to do)
-
-# leave one city cross-val
-
-```{r}
-#mod_SMOD <- glmer(cbind(N_nema,N-N_nema)~SMOD_type+(1|Population),data=data,family=binomial)
-#
-#mod_SMOD_noLeuven <- glmer(cbind(N_nema,N-N_nema)~SMOD_type+(1|Population),
-#                 data=filter(data,City!="Leuven"),
-#                 family=binomial)
-#
-#mod_SMOD_noGhent <- glmer(cbind(N_nema,N-N_nema)~SMOD_type+(1|Population),
-#                 data=filter(data,City!="Ghent"),
-#                 family=binomial)
-#
-#mod_SMOD_noBrussels <- glmer(cbind(N_nema,N-N_nema)~SMOD_type+(1|Population),
-#                 data=filter(data,City!="Brussels"),
-#                 family=binomial)
-
-#preds_full <- emmeans(mod_SMOD,specs = ~ SMOD_type, type="response") |> 
-#  as_tibble() |> 
-#  mutate(dataset = "full dataset")
-
-#preds_noLeuven <- emmeans(mod_SMOD_noLeuven,specs = ~ SMOD_type, type="response") |> 
-#  as_tibble() |> 
-#  mutate(dataset = "minus Leuven")
-
-#preds_noGhent <- emmeans(mod_SMOD_noGhent,specs = ~ SMOD_type, type="response") |> 
-#  as_tibble() |> 
-#  mutate(dataset = "minus Ghent")
-
-#preds_noBrussels <- emmeans(mod_SMOD_noBrussels,specs = ~ SMOD_type, type="response") |> 
-#  as_tibble() |> 
-#  mutate(dataset = "minus Brussels")
-
-#rbind(preds_full,preds_noLeuven,preds_noGhent,preds_noBrussels) |> 
-#ggplot() + 
-#  geom_pointrange(aes(x=SMOD_type,y=prob,ymin=asymp.LCL,ymax=asymp.UCL,fill=dataset),size=1,pch=21,position=position_dodge(width=0.5))+
-#  labs(x="Urbanisation type (SMOD, 1km grid)", y = "Proportion of shells with nematodes (model prediction and CI95%)")+
-#  theme_bw()
-
-```
-
-# intensity (ish, number of nematodes in shells containing nematodes)
-
-```{r}
-library(lme4)
-library(glmmTMB)
-
-infected <- nematodes |> 
-  filter(Nematodes > 0) |> 
-  left_join(points) |> 
-  mutate(Nematodes_minus_1 = Nematodes - 1)  # so the test variable stays bounded at 0
-
-mod=glmer(Nematodes_minus_1 ~ SMOD_type + (1|Population),data=infected, family=poisson)
-# convergence issue, let's use glmmTMB
-mod=glmmTMB(Nematodes_minus_1 ~ SMOD_type + (1|Population),data=infected, family=poisson)
-plot(simulateResiduals(mod))
-Anova(mod)
-
-
-preds_infected <- emmeans(mod,specs = ~ SMOD_type, type="response") |> 
-  as_tibble()
-
-ggplot(infected) + 
-  geom_point(aes(SMOD_type,Nematodes),position = position_jitter(width=0.3,height=0),col="darkgrey") + 
-  geom_pointrange(data = preds_infected, aes(x=SMOD_type,y=rate + 1,ymin=asymp.LCL + 1,ymax=asymp.UCL + 1),size=1,pch=21,fill="white") +
-  labs(x="Urbanisation type (SMOD, 1km grid)", y = "Number of nematodes per shell containing nematodes")+
-  scale_y_log10()+
-  theme_bw()
-```
-
-# a side note: SMOD matches the SPEEDY topology
+# S1: correlations between urbanisation metrics //  SMOD matches the SPEEDY topology (to make better)
 
 ```{r}
 SPEEDY_threshold <- tibble( ## from e.g. Piano et al papers
@@ -136,34 +63,32 @@ ggplot(points)+
   labs(x="Degree of Urbanisation (GHS-SMOD, 1km grid cell)", y = "Proportion built-up within 1km grid cell")+
   theme_bw()
 
-# we have sites in the 3-5% void between SPEEDY low and medium. DO we assign them to low or medium?
-data$SPEEDY1=case_when(data$BUILT1000<=(0.03*1000*1000)~"1 - Rural", # assigned to medium if 3-5%
-                      data$BUILT1000>=(0.15*1000*1000)~"3 - Highly Urban",
-                      T~"2 - Medium")
-
-data$SPEEDY2=case_when(data$BUILT1000<=(0.05*1000*1000)~"1 - Rural", # assigned to low if 3-5%
-                      data$BUILT1000>=(0.15*1000*1000)~"3 - Highly Urban",
-                      T~"2 - Medium")
-
-table(data$SPEEDY1,data$SMOD_type)
-table(data$SPEEDY2,data$SMOD_type)
-
-mod_SPEEDY1 <- glm(cbind(N_nema,N-N_nema)~SPEEDY1,data=data,family=binomial)
-mod_SPEEDY2 <- glm(cbind(N_nema,N-N_nema)~SPEEDY2,data=data,family=binomial)
-
-summary(mod_SPEEDY1)
-summary(mod_SPEEDY2)
-
-AICc(mod_SMOD,mod_SPEEDY1,mod_SPEEDY2) # intermediate between SMOD and next best models
-
-
-
-ggplot(points)+geom_boxplot(aes(SMOD_type,POP1000,col=SMOD_type))+ 
-  labs(x="Degree of Urbanisation (GHS-SMOD, 1km grid cell)", y = "Population density (people/km^2)")+
-  theme_bw()
-
-## if SMOD better, may reflect non-linear effects of continuous variables of urbanisation?
-
-modx <- glm(cbind(N_nema,N-N_nema)~log(POP1000,10),data=data,family=quasibinomial)
-## better than linear model, but still outperformed by SMOD
 ```
+
+
+
+# intensity (ish, number of nematodes in shells containing nematodes)
+
+```{r}
+
+infected <- nematodes |> 
+  filter(Nematodes > 0) |> 
+  left_join(points) |> 
+  mutate(Nematodes_minus_1 = Nematodes - 1)  # so the test variable stays bounded at 0
+
+mod=glmmTMB(Nematodes_minus_1 ~ SMOD_type + City + (1|Population),data=infected, family=poisson)
+plot(simulateResiduals(mod))
+Anova(mod)
+
+
+preds_infected <- emmeans(mod,specs = ~ SMOD_type, type="response") |> 
+  as_tibble()
+
+ggplot(infected) + 
+  geom_point(aes(SMOD_type,Nematodes),position = position_jitter(width=0.3,height=0),col="darkgrey") + 
+  geom_pointrange(data = preds_infected, aes(x=SMOD_type,y=rate + 1,ymin=asymp.LCL + 1,ymax=asymp.UCL + 1),size=1,pch=21,fill="white") +
+  labs(x="Urbanisation type (SMOD, 1km grid)", y = "Number of nematodes per shell containing nematodes")+
+  scale_y_log10()+
+  theme_bw()
+```
+

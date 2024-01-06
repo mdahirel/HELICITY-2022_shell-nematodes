@@ -8,14 +8,13 @@ editor_options:
 
 
 ```{r packages}
-library(sf)
-library(DHARMa)
 library(car)
+library(DHARMa)
 library(emmeans)
-library(ncf)  # for spline correlograms
-library(lme4)
+library(glmmTMB)
 library(MuMIn)
-
+library(ncf)  # for spline correlograms
+library(sf)
 
 library(tidyverse)
 
@@ -85,12 +84,12 @@ mean(nearest_dist)
 ```
 
 ```{r}
-mod_built100 <- glm(cbind(N_nema,N-N_nema)~scale(BUILT100),data=data,family=binomial)
-mod_built1000 <- glm(cbind(N_nema,N-N_nema)~scale(BUILT1000),data=data,family=binomial)
-mod_pop100 <- glm(cbind(N_nema,N-N_nema)~scale(POP100),data=data,family=binomial)
-mod_pop1000 <- glm(cbind(N_nema,N-N_nema)~scale(POP1000),data=data,family=binomial)
+mod_built100 <- glm(cbind(N_nema,N-N_nema)~scale(BUILT100)+City,data=data,family=binomial)
+mod_built1000 <- glm(cbind(N_nema,N-N_nema)~scale(BUILT1000)+City,data=data,family=binomial)
+mod_pop100 <- glm(cbind(N_nema,N-N_nema)~scale(POP100)+City,data=data,family=binomial)
+mod_pop1000 <- glm(cbind(N_nema,N-N_nema)~scale(POP1000)+City,data=data,family=binomial)
 
-mod_SMOD <- glm(cbind(N_nema,N-N_nema)~SMOD_type,data=data,family=binomial)
+mod_SMOD <- glm(cbind(N_nema,N-N_nema)~SMOD_type+City,data=data,family=binomial)
 ```
 
 ## test for model assumption
@@ -118,15 +117,13 @@ tibble(
   geom_vline(xintercept = 5)
 ```
 
-
-
 ```{r}
-mod_built100_OLRE <- glmer(cbind(N_nema,N-N_nema)~scale(BUILT100)+(1|Population),data=data,family=binomial)
-mod_built1000_OLRE <- glmer(cbind(N_nema,N-N_nema)~scale(BUILT1000)+(1|Population),data=data,family=binomial)
-mod_pop100_OLRE <- glmer(cbind(N_nema,N-N_nema)~scale(POP100)+(1|Population),data=data,family=binomial)
-mod_pop1000_OLRE <- glmer(cbind(N_nema,N-N_nema)~scale(POP1000)+(1|Population),data=data,family=binomial)
+mod_built100_BB <- glmmTMB(cbind(N_nema,N-N_nema)~scale(BUILT100)+City,data=data,family=betabinomial)
+mod_built1000_BB <- glmmTMB(cbind(N_nema,N-N_nema)~scale(BUILT1000)+City,data=data,family=betabinomial)
+mod_pop100_BB <- glmmTMB(cbind(N_nema,N-N_nema)~scale(POP100)+City,data=data,family=betabinomial)
+mod_pop1000_BB <- glmmTMB(cbind(N_nema,N-N_nema)~scale(POP1000)+City,data=data,family=betabinomial)
 
-mod_SMOD_OLRE <- glmer(cbind(N_nema,N-N_nema)~SMOD_type+(1|Population),data=data,family=binomial)
+mod_SMOD_BB <- glmmTMB(cbind(N_nema,N-N_nema)~SMOD_type+City,data=data,family=betabinomial)
 ```
 
 # model comparison
@@ -134,13 +131,15 @@ mod_SMOD_OLRE <- glmer(cbind(N_nema,N-N_nema)~SMOD_type+(1|Population),data=data
 ```{r}
 model.sel(mod_built100,mod_built1000,mod_pop100,mod_pop1000,mod_SMOD,rank="AICc")
 
-model.sel(mod_built100_OLRE,mod_built1000_OLRE,mod_pop100_OLRE,mod_pop1000_OLRE,mod_SMOD_OLRE,rank="AICc")
+model.sel(mod_built100_BB,mod_built1000_BB,mod_pop100_BB,mod_pop1000_BB,mod_SMOD_BB,rank="AICc")
+
+# separate model selection tables or together? TBD; anyway, doesn't change much in paper
 ```
 
 # autocorrelation check
 
 ```{r}
-simres <- simulateResiduals(mod_SMOD_OLRE,n=1000)
+simres <- simulateResiduals(mod_SMOD_BB,n=1000)
 
 plot(simres)
 
@@ -149,7 +148,7 @@ testSpatialAutocorrelation(simulationOutput = simres,
 
 
 correlog <- spline.correlog (x = data$x/1000, y = data$y/1000,
-                             z = residuals(mod_SMOD_OLRE, type = "pearson"))
+                             z = residuals(mod_SMOD_BB, type = "pearson"))
 
 plot(correlog) # no evidence of residual autocorrelation
 ```
@@ -157,28 +156,30 @@ plot(correlog) # no evidence of residual autocorrelation
 
 # model exploration
 
+
+
 ```{r}
-# binomial case
+
+# with beta-binomial
+
+Anova(mod_SMOD_BB)
+
+contrast(emmeans(mod_SMOD_BB,specs = ~ SMOD_type),method="pairwise")
+
+preds_BB <- emmeans(mod_SMOD_BB,specs = ~ SMOD_type, type="response") |> 
+  as_tibble() |> 
+  mutate(type="beta-binomial")
+```
+
+```{r}
+# binomial case # for display only
 
 Anova(mod_SMOD)
 
 contrast(emmeans(mod_SMOD,specs = ~ SMOD_type),method="pairwise")
-preds <- emmeans(mod_SMOD,specs = ~ SMOD_type, type="response")|> 
+preds_B <- emmeans(mod_SMOD,specs = ~ SMOD_type, type="response")|> 
   as_tibble() |> 
-  mutate(type="no OLRE")
-```
-
-```{r}
-
-# with OLRE case, used for plots
-
-Anova(mod_SMOD_OLRE)
-
-contrast(emmeans(mod_SMOD_OLRE,specs = ~ SMOD_type),method="pairwise")
-
-preds_OLRE <- emmeans(mod_SMOD_OLRE,specs = ~ SMOD_type, type="response") |> 
-  as_tibble() |> 
-  mutate(type="with OLRE")
+  mutate(type="binomial")
 ```
 
 # plot
@@ -186,7 +187,7 @@ preds_OLRE <- emmeans(mod_SMOD_OLRE,specs = ~ SMOD_type, type="response") |>
 ```{r}
 ggplot(data) + 
   geom_point(aes(SMOD_type,N_nema/N,size=N),position = position_jitter(width=0.3,height=0),col="darkgrey") + 
-  geom_pointrange(data = preds_OLRE, aes(x=SMOD_type,y=prob,ymin=asymp.LCL,ymax=asymp.UCL),size=1,pch=21,fill="white")+ 
+  geom_pointrange(data = preds_BB, aes(x=SMOD_type,y=prob,ymin=asymp.LCL,ymax=asymp.UCL),size=1,pch=21,fill="white")+ 
   scale_size_area("Number of snails") + 
   labs(x="Degree of Urbanisation (GHS-SMOD, 1km grid cell)", y = "Proportion of shells with nematodes")+
   theme_bw()
@@ -196,7 +197,7 @@ ggplot(data) +
 
 ggplot(data) + 
   geom_point(aes(SMOD_type,N_nema/N,size=N),position = position_jitter(width=0.3,height=0),col="darkgrey") + 
-  geom_pointrange(data = rbind(preds,preds_OLRE), aes(x=SMOD_type,y=prob,ymin=asymp.LCL,ymax=asymp.UCL,col=type),size=1,pch=21,fill="white",position=position_dodge(width=0.2))+ 
+  geom_pointrange(data = rbind(preds_B,preds_BB), aes(x=SMOD_type,y=prob,ymin=asymp.LCL,ymax=asymp.UCL,col=type),size=1,pch=21,fill="white",position=position_dodge(width=0.2))+ 
   scale_size_area("Number of snails") + 
   labs(x="Degree of Urbanisation (GHS-SMOD, 1km grid cell)", y = "Proportion of shells with nematodes")+
   theme_bw()
