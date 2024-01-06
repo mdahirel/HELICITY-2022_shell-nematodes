@@ -13,6 +13,7 @@ library(DHARMa)
 library(car)
 library(emmeans)
 library(ncf)  # for spline correlograms
+library(lme4)
 library(MuMIn)
 
 
@@ -92,36 +93,92 @@ mod_pop1000 <- glm(cbind(N_nema,N-N_nema)~scale(POP1000),data=data,family=binomi
 mod_SMOD <- glm(cbind(N_nema,N-N_nema)~SMOD_type,data=data,family=binomial)
 ```
 
-# model comparison and check
+## test for model assumption
+
+```{r}
+testDispersion(mod_SMOD)
+testDispersion(mod_SMOD,type="PearsonChisq")
+performance::check_overdispersion(mod_SMOD)
+
+## you can test with all five models, similar behaviour:
+## conflict between the simulation-based DHARMa and the traditional parametric test
+## there are indication that maybe the traditional one is anticonservative because we have low min(Np, N(1-p))
+## see https://github.com/florianhartig/DHARMa/issues/117 and link to ben bolker FAQ
+## we are in such a case here:
+
+tibble(
+  Np = fitted(mod_SMOD)*data$N,
+  N1minusp = (1-fitted(mod_SMOD))*data$N
+) |> 
+  rowwise() |> 
+  mutate(min_of_Np_N1minusp=min(Np,N1minusp)) |> 
+  ungroup() |> 
+  ggplot()+
+  geom_histogram(aes(min_of_Np_N1minusp))+
+  geom_vline(xintercept = 5)
+```
+
+
+
+```{r}
+mod_built100_OLRE <- glmer(cbind(N_nema,N-N_nema)~scale(BUILT100)+(1|Population),data=data,family=binomial)
+mod_built1000_OLRE <- glmer(cbind(N_nema,N-N_nema)~scale(BUILT1000)+(1|Population),data=data,family=binomial)
+mod_pop100_OLRE <- glmer(cbind(N_nema,N-N_nema)~scale(POP100)+(1|Population),data=data,family=binomial)
+mod_pop1000_OLRE <- glmer(cbind(N_nema,N-N_nema)~scale(POP1000)+(1|Population),data=data,family=binomial)
+
+mod_SMOD_OLRE <- glmer(cbind(N_nema,N-N_nema)~SMOD_type+(1|Population),data=data,family=binomial)
+```
+
+# model comparison
+
 ```{r}
 model.sel(mod_built100,mod_built1000,mod_pop100,mod_pop1000,mod_SMOD,rank="AICc")
 
-plot(simulateResiduals(mod_SMOD))
-outliers(simulateResiduals(mod_SMOD))
-
-mod_rerun <- glm(cbind(N_nema,N-N_nema)~SMOD_type,
-                 data=data[-c(outliers(simulateResiduals(mod_SMOD))),],
-                 family=binomial)
+model.sel(mod_built100_OLRE,mod_built1000_OLRE,mod_pop100_OLRE,mod_pop1000_OLRE,mod_SMOD_OLRE,rank="AICc")
 ```
 
-# test for residual spatial autocorrelation
+# autocorrelation check
 
 ```{r}
+simres <- simulateResiduals(mod_SMOD_OLRE,n=1000)
+
+plot(simres)
+
+testSpatialAutocorrelation(simulationOutput = simres, 
+                           x = data$x, y= data$y)
+
+
 correlog <- spline.correlog (x = data$x/1000, y = data$y/1000,
-                             z = residuals(mod_SMOD, type = "pearson"))
+                             z = residuals(mod_SMOD_OLRE, type = "pearson"))
 
 plot(correlog) # no evidence of residual autocorrelation
 ```
 
 
 # model exploration
+
 ```{r}
+# binomial case
+
 Anova(mod_SMOD)
 
 contrast(emmeans(mod_SMOD,specs = ~ SMOD_type),method="pairwise")
+preds <- emmeans(mod_SMOD,specs = ~ SMOD_type, type="response")|> 
+  as_tibble() |> 
+  mutate(type="no OLRE")
+```
 
-preds <- emmeans(mod_SMOD,specs = ~ SMOD_type, type="response") |> 
-  as_tibble()
+```{r}
+
+# with OLRE case, used for plots
+
+Anova(mod_SMOD_OLRE)
+
+contrast(emmeans(mod_SMOD_OLRE,specs = ~ SMOD_type),method="pairwise")
+
+preds_OLRE <- emmeans(mod_SMOD_OLRE,specs = ~ SMOD_type, type="response") |> 
+  as_tibble() |> 
+  mutate(type="with OLRE")
 ```
 
 # plot
@@ -129,10 +186,18 @@ preds <- emmeans(mod_SMOD,specs = ~ SMOD_type, type="response") |>
 ```{r}
 ggplot(data) + 
   geom_point(aes(SMOD_type,N_nema/N,size=N),position = position_jitter(width=0.3,height=0),col="darkgrey") + 
-  geom_pointrange(data = preds, aes(x=SMOD_type,y=prob,ymin=asymp.LCL,ymax=asymp.UCL),size=1,pch=21,fill="white")+ 
+  geom_pointrange(data = preds_OLRE, aes(x=SMOD_type,y=prob,ymin=asymp.LCL,ymax=asymp.UCL),size=1,pch=21,fill="white")+ 
   scale_size_area("Number of snails") + 
   labs(x="Degree of Urbanisation (GHS-SMOD, 1km grid cell)", y = "Proportion of shells with nematodes")+
   theme_bw()
 ```
 
+```{r}
 
+ggplot(data) + 
+  geom_point(aes(SMOD_type,N_nema/N,size=N),position = position_jitter(width=0.3,height=0),col="darkgrey") + 
+  geom_pointrange(data = rbind(preds,preds_OLRE), aes(x=SMOD_type,y=prob,ymin=asymp.LCL,ymax=asymp.UCL,col=type),size=1,pch=21,fill="white",position=position_dodge(width=0.2))+ 
+  scale_size_area("Number of snails") + 
+  labs(x="Degree of Urbanisation (GHS-SMOD, 1km grid cell)", y = "Proportion of shells with nematodes")+
+  theme_bw()
+```
