@@ -1,28 +1,53 @@
 ---
-title: "supplementary"
-author: "Maxime Dahirel"
-format: html
+title: "_Cepaea nemoralis_ snails are less likely to trap nematodes within their shells in urban areas - supplementary material"
+author: "Maxime Dahirel, Hannah Reyné, Katrien De Wolf, Dries Bonte"
+bibliography: references.bib
+format: pdf
 editor_options: 
   chunk_output_type: console
 ---
 
 
 ```{r packages}
+#| echo: false
+#| message: false
+#| output: false
 library(sf)
 library(car)
 library(emmeans)
 library(glmmTMB)
+library(ggtext)
 library(DHARMa)
 library(tidyverse)
 
 library(here)
 ```
 
- 
+```{r data}
+#| echo: false
+#| message: false
+#| output: false
+nematodes_raw <- read_csv(here("data","HELICITY22_nematodes.csv"))
+colours_raw <- read_csv(here("data","HELICITY22_shellcolours.csv"))
 
-```{r}
-nematodes <- read_csv(here("data","HELICITY22_nematodes.csv"))
+points_raw <- st_read(here("data","HELICITY22_sites_BELambert72_wGHSL.gpkg")) 
+```
 
+# S1 - Variation in human population density and in built-up surfaces between Degrees of Urbanisation
+
+We show here (**Figs S1-1 and S1-2**) the relationships in our sites between the Degree of Urbanisation classes [@eurostateuropeancommissionApplyingDegreeUrbanisation2021] and the corresponding values of human population density and built-up cover, all from 1000 m resolution rasters.
+
+- For both population density and built-up, the differences between the classes scale non-linearly, with the difference between the average Urban Centre site and the average "intermediate" site being much larger than the difference between the average intermediate and rural sites;  
+
+- Urban Centre sites contain a much broader range of variation in either variable, compared to intermediate and rural sites;  
+
+- Interestingly, the differences in built-up surfaces between the three Degree of Urbanisation classes map almost exactly to built-up thresholds designed and used independently in a series of urban ecology studies from Belgian sites [e.g. @merckxIncreasedBodySize2018; @pianoUrbanizationDrivesCrosstaxon2020] (**Fig. S1-2**). Degree of Urbanisation classes can therefore (_for our data_) be interpreted as encoding both variation in density and in built-up surfaces. 
+
+
+```{r load-points}
+#| echo: false
+#| message: false
+#| output: false
 points <- st_read(here("data","HELICITY22_sites_BELambert72_wGHSL.gpkg")) |> 
   mutate(x=st_coordinates(geom)[,1],
          y=st_coordinates(geom)[,2]) |> 
@@ -35,60 +60,123 @@ points <- st_read(here("data","HELICITY22_sites_BELambert72_wGHSL.gpkg")) |>
   )
 ```
 
-```{r}
-data <- nematodes |> 
-  mutate(has.nematodes = Nematodes>0) |> 
-  group_by(Population) |>
-  summarise(
-    N_nema = sum(has.nematodes, na.rm=TRUE),
-    N = sum(!is.na(has.nematodes))
-  ) |> 
-  left_join(points) |> 
-  st_as_sf()
+```{r s1-plot-1}
+#| echo: false
+ggplot(points)+
+  geom_boxplot(aes(SMOD_type,POP1000))+ 
+  #geom_hline(yintercept=c(300,1500),lty=2)+
+  labs(x="Degree of Urbanisation (GHS-SMOD, 1km grid cell)", y = "Population density in grid cell (people/km^2^)")+
+  theme_bw() + 
+  theme(axis.title.y = element_markdown())
 ```
 
-# S1: correlations between urbanisation metrics //  SMOD matches the SPEEDY topology (to make better)
+**Figure S1-1.** Relationship between Degree of Urbanisation classes and human population densities, for all 36 visited sites (including sites with no snails found).
 
-```{r}
+```{r s1-speedy-thresholds}
+#| echo: false
+#| message: false
+#| output: false
 SPEEDY_threshold <- tibble( ## from e.g. Piano et al papers
   ymin=c(0,0.05,0.15),
   ymax=c(0.03,0.1,1),
-  SPEEDY_type=c("low","medium","high")
+  ylab=c(0.015,0.075,0.45),
+  SPEEDY_type=c("1 - low built-up","2 - medium built-up","3 - high built-up")
 )
+```
 
 
+```{r s1-plot-2}
+#| echo: false
 ggplot(points)+
-  geom_hline(yintercept = c(0,0.03,0.05,0.1,0.15))+
-  geom_boxplot(aes(SMOD_type,BUILT1000/(1000*1000),col=SMOD_type))+ 
+  geom_boxplot(aes(SMOD_type,BUILT1000/(1000*1000)))+ 
+  geom_ribbon(data=SPEEDY_threshold |> expand_grid(x=c(-1:5)),aes(x=x,ymin=ymin,ymax=ymax,fill=SPEEDY_type), alpha=0.5)+
+  geom_boxplot(aes(SMOD_type,BUILT1000/(1000*1000)))+ 
+  geom_label(data=SPEEDY_threshold,aes(x=4,y=ylab,label=SPEEDY_type),hjust=1)+
   labs(x="Degree of Urbanisation (GHS-SMOD, 1km grid cell)", y = "Proportion built-up within 1km grid cell")+
-  theme_bw()
+  scale_fill_brewer(type="seq")+
+  coord_cartesian(ylim=c(0,0.5),xlim=c(0.5,3.5)) + 
+  theme_bw()+theme(legend.position = "none")
+
+```
+
+**Figure S1-2.** Relationship between Degree of Urbanisation classes and built-up surfaces, for all 36 visited sites (including sites with no snails found). Shaded areas and corresponding labels mark the limits of the three urban classes used in studies from the Belgian SPEEDY project, including for instance @merckxIncreasedBodySize2018 or @pianoUrbanizationDrivesCrosstaxon2020.
+
+# S2 - Intensity of nematodes trapped in shells
+
+```{r s2-data}
+#| echo: false
+#| message: false
+#| output: false
+infected <- nematodes_raw |> 
+  left_join(colours_raw) |> 
+  left_join(points) |> 
+  filter(Nematodes > 0) |>
+  mutate(Nematodes_minus_1 = Nematodes - 1)  # so the test variable stays bounded at 0
+```
+
+Shells that do contain nematodes may also vary in the numbers of nematodes they harbour [in the context of active infections, this is termed "intensity", @bushParasitologyMeetsEcology1997]. However, given the relatively low number of shells with nematodes (`r length(infected$Nematodes)`) especially relative to the number of sites, and given the expected high dispersion of these numbers [e.g. @raeGastropodShellHas2017], we do not consider our intensity dataset to be sufficiently large to be given consideration in the main text.
+The partial analysis of these data we present below is therefore intended for indicative purposes only.
+
+Using the subset of shells where nematodes were detected, we ran a negative binomial GLMM on the number of nematodes per shell - 1, with the same fixed and random effect structure as the best model for nematode prevalence (see **main text**). We find no clear indication that these numbers differed between urbanisation levels (**Table S2-1**, **Fig. S2-1**), or in relation to shell phenotype (**Table S2-1**). 
+
+```{r s2-analysis}
+#| echo: false
+#| message: false
+#| output: false
+mod=glmmTMB(Nematodes_minus_1 ~ SMOD_type + City + col+scale(nbands)+fusion + (1|Population),data=infected, family=poisson)
+
+plot(simulateResiduals(mod))
+testDispersion(simulateResiduals(mod),alternative="greater")
+testDispersion(simulateResiduals(mod),type="PearsonChisq",alternative="greater")
+performance::check_overdispersion(mod) # conflict between parametric and non parametric; let's assume OD
+## NB: saving the performance::check_overdispersion() test as an object and exploring it with str() confirms it's the same as
+## DHARMa::testDispersion(type="PearsonChisq",alternative="greater")
+
+mod=glmmTMB(Nematodes_minus_1 ~ SMOD_type + City + col+scale(nbands)+fusion + (1|Population),data=infected, family=nbinom2)
+plot(simulateResiduals(mod))
+testDispersion(simulateResiduals(mod),alternative="greater")
+testDispersion(simulateResiduals(mod),type="PearsonChisq",alternative="greater")
+performance::check_overdispersion(mod) # no conflict anymore
+
+preds_infected <- emmeans(mod,specs = ~ SMOD_type, type="response") |> 
+  as_tibble()
+```
+
+**Table S2-1.** Analysis of Deviance for the effect of urbanisation and shell phenotype on the number of nematodes per shell (on the subset of shells containing at least one nematode).
+
+```{r s2-table}
+#| echo: false
+#| message: false
+#| warning: false
+
+Anova(mod) |> 
+  as.data.frame() |> 
+  mutate(Chisq = round(Chisq,2)) |> 
+  rename(`$\\Chi^2$`="Chisq",`_p_` = `Pr(>Chisq)`) |> 
+  mutate(`_p_` = round(`_p_`,2)) |> 
+  rownames_to_column(var="variable") |> 
+  mutate(variable=case_when(
+    variable=="SMOD_type"~"Degree of Urbanisation",
+    variable=="City"~"City",
+    variable=="col"~"Shell background colour",
+    variable=="scale(nbands)"~"Number of bands",
+    variable=="fusion"~"Band fusion"
+  )) |> 
+  knitr::kable()
 
 ```
 
 
-
-# intensity (ish, number of nematodes in shells containing nematodes)
-
-```{r}
-
-infected <- nematodes |> 
-  filter(Nematodes > 0) |> 
-  left_join(points) |> 
-  mutate(Nematodes_minus_1 = Nematodes - 1)  # so the test variable stays bounded at 0
-
-mod=glmmTMB(Nematodes_minus_1 ~ SMOD_type + City + (1|Population),data=infected, family=poisson)
-plot(simulateResiduals(mod))
-Anova(mod)
-
-
-preds_infected <- emmeans(mod,specs = ~ SMOD_type, type="response") |> 
-  as_tibble()
-
+```{r s2-plot}
+#| echo: false
 ggplot(infected) + 
   geom_point(aes(SMOD_type,Nematodes),position = position_jitter(width=0.3,height=0),col="darkgrey") + 
-  geom_pointrange(data = preds_infected, aes(x=SMOD_type,y=rate + 1,ymin=asymp.LCL + 1,ymax=asymp.UCL + 1),size=1,pch=21,fill="white") +
-  labs(x="Urbanisation type (SMOD, 1km grid)", y = "Number of nematodes per shell containing nematodes")+
+  geom_pointrange(data = preds_infected, aes(x=SMOD_type,y=response + 1,ymin=asymp.LCL + 1,ymax=asymp.UCL + 1),size=1,pch=21,fill="white") +
+  labs(x="Urbanisation type (SMOD, 1km grid)", y = "Number of nematodes per shell")+
   scale_y_log10()+
   theme_bw()
 ```
 
+**Figure S2-1.** Relationship between the Degree of Urbanisation in 1000m grid cells and the number of nematodes _in shells that contain at least one nematode_. Grey dots are observed values; white dots (and error bars) are estimated marginal means from the best model (and their 95% confidence intervals), with the effects of city identity and phenotypic traits averaged out. Note that the $y$ axis is on the log scale.
+
+# References
