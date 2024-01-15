@@ -12,15 +12,18 @@ editor_options:
 #| echo: false
 #| message: false
 #| output: false
-library(sf)
-library(car)
-library(emmeans)
-library(glmmTMB)
-library(ggtext)
-library(DHARMa)
-library(tidyverse)
+#| 
+library(car)         # CRAN v3.1-2
+library(DHARMa)      # CRAN v0.4.6
+library(emmeans)     # CRAN v1.9.0
+library(ggtext)      # CRAN v0.1.2
+library(glmmTMB)     # CRAN v1.1.8
+library(performance) # CRAN v0.10.8
+library(sf)          # CRAN v1.0-15
 
-library(here)
+library(tidyverse)   # CRAN v2.0.0
+
+library(here)        # CRAN v1.0.1
 ```
 
 ```{r data}
@@ -35,9 +38,9 @@ points_raw <- st_read(here("data","HELICITY22_sites_BELambert72_wGHSL.gpkg"))
 
 # S1 - Variation in human population density and in built-up surfaces between Degrees of Urbanisation
 
-We show here (**Figs S1-1 and S1-2**) the relationships in our sites between the Degree of Urbanisation classes [@eurostateuropeancommissionApplyingDegreeUrbanisation2021] and the corresponding values of human population density and built-up cover, all from 1000 m resolution rasters.
+We show here (**Figs S1-1 and S1-2**) the relationships in our sites between the Degree of Urbanisation classes [@eurostateuropeancommissionApplyingDegreeUrbanisation2021] and the corresponding values of human population density and built-up cover, both from 1000 m resolution rasters.
 
-- For both population density and built-up, the differences between the classes scale non-linearly, with the difference between the average Urban Centre site and the average "intermediate" site being much larger than the difference between the average intermediate and rural sites;  
+- For both population density and built-up, the differences between the classes scale non-linearly, with the difference between the average Urban Centre site and the average "intermediate" site being larger than the difference between the average intermediate and rural sites;  
 
 - Urban Centre sites contain a much broader range of variation in either variable, compared to intermediate and rural sites;  
 
@@ -111,7 +114,8 @@ infected <- nematodes_raw |>
   left_join(colours_raw) |> 
   left_join(points) |> 
   filter(Nematodes > 0) |>
-  mutate(Nematodes_minus_1 = Nematodes - 1)  # so the test variable stays bounded at 0
+  mutate(Nematodes_minus_1 = Nematodes - 1)  # so the test variable for count models stays bounded at 0
+# we're effectively modelling the nematodes "in excess" of the minimum 1 needed to be in this sub-dataset
 ```
 
 Shells that do contain nematodes may also vary in the numbers of nematodes they harbour [in the context of active infections, this is termed "intensity", @bushParasitologyMeetsEcology1997]. However, given the relatively low number of shells with nematodes (`r length(infected$Nematodes)`) especially relative to the number of sites, and given the expected high dispersion of these numbers [e.g. @raeGastropodShellHas2017], we do not consider our intensity dataset to be sufficiently large to be given consideration in the main text.
@@ -128,7 +132,7 @@ mod=glmmTMB(Nematodes_minus_1 ~ SMOD_type + City + col+scale(nbands)+fusion + (1
 plot(simulateResiduals(mod))
 testDispersion(simulateResiduals(mod),alternative="greater")
 testDispersion(simulateResiduals(mod),type="PearsonChisq",alternative="greater")
-performance::check_overdispersion(mod) # conflict between parametric and non parametric; let's assume OD
+check_overdispersion(mod) # conflict between parametric and non parametric; let's assume overdispersion to be safe
 ## NB: saving the performance::check_overdispersion() test as an object and exploring it with str() confirms it's the same as
 ## DHARMa::testDispersion(type="PearsonChisq",alternative="greater")
 
@@ -177,6 +181,6 @@ ggplot(infected) +
   theme_bw()
 ```
 
-**Figure S2-1.** Relationship between the Degree of Urbanisation in 1000m grid cells and the number of nematodes _in shells that contain at least one nematode_. Grey dots are observed values; white dots (and error bars) are estimated marginal means from the best model (and their 95% confidence intervals), with the effects of city identity and phenotypic traits averaged out. Note that the $y$ axis is on the log scale.
+**Figure S2-1.** Relationship between the Degree of Urbanisation in 1000m grid cells and the number of nematodes _in shells that contain at least one nematode_. Grey dots are observed values; white dots (and error bars) are estimated marginal means from the best model (and their 95% confidence intervals), with the effects of city identity and phenotypic traits averaged out. Note the $\log_{10}$ scale on the $y$ axis.
 
 # References

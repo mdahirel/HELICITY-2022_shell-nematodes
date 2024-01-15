@@ -7,17 +7,17 @@ editor_options:
 ---
 
 ```{r packages}
-library(car)
-library(DHARMa)
-library(emmeans)
-library(glmmTMB)
-library(MuMIn)
-library(ncf)
-library(sf)
+library(car)       # CRAN v3.1-2
+library(DHARMa)    # CRAN v0.4.6
+library(emmeans)   # CRAN v1.9.0
+library(glmmTMB)   # CRAN v1.1.8
+library(MuMIn)     # CRAN v1.47.5
+library(ncf)       # CRAN v1.3-2
+library(sf)        # CRAN v1.0-15
 
-library(tidyverse)
+library(tidyverse) # CRAN v2.0.0
 
-library(here)
+library(here)      # CRAN v1.0.1
 ```
 
 # Loading data
@@ -37,10 +37,10 @@ The `nematodes_raw` dataset is a simple data frame with three columns:
 - `Individual_ID`: a unique ID for each snail
 - `Nematodes`: the number of nematodes found trapped in the shell of the focal snail. NAs are cases where a snail that was collected was accidentally lost during handling
 
-The `nematodes_raw` dataset is another simple data frame with five columns:
+The `colours_raw` dataset is another simple data frame with five columns:
 
 - `Population` and `Individual_ID` as above
-- `morph`: the shell colour morph using the traditional notation for _Cepaea_ morphs. Note: band interruptions are not recorded here differently from full bands
+- `morph`: the shell colour morph using the traditional notation for _Cepaea_ morphs. Note: band interruptions are not recorded here differently from full bands (they are rare anyway, there might have been 1-5 individuals total, but definitely <10)
 - `col`: the background colour as extracted from `morph`
 - `nbands`: the number of shell bands as extracted from `morph` (two fused bands count as two bands)
 - `fusion`: if the shell has bands, whether or not some of these are fused together
@@ -151,7 +151,7 @@ mod_SMOD <- glmmTMB(has.nematodes~SMOD_type+City+col+nbands+fusion+(1|Population
 
 mod_null <- glmmTMB(has.nematodes~City+col+nbands+fusion+(1|Population),data=data,family=binomial)
 # we use glmmTMB() rather than lme4::glmer() because some models have convergence issues on the latter
-# easy to check that the models with no issues give the same thing (to several decimals) on both 
+# easy to check that the models with no issues give the same thing (to several decimals) on both packages
 
 ```
 
