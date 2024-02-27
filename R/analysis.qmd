@@ -28,6 +28,8 @@ We first load our snail data and our environmental data:
 nematodes_raw <- read_csv(here("data","HELICITY22_nematodes.csv"))
 colours_raw <- read_csv(here("data","HELICITY22_shellcolours.csv"))
 
+size_raw <- read_csv(here("data","HELICITY22_shellsize.csv"))
+
 points_raw <- st_read(here("data","HELICITY22_sites_BELambert72_wGHSL.gpkg")) 
 ```
 
@@ -36,6 +38,11 @@ The `nematodes_raw` dataset is a simple data frame with three columns:
 - `Population`: a number ID for each site  
 - `Individual_ID`: a unique ID for each snail
 - `Nematodes`: the number of nematodes found trapped in the shell of the focal snail. NAs are cases where a snail that was collected was accidentally lost during handling
+
+The `size_raw` dataset contains three columns:
+
+- `Population` and `Individual_ID` as above
+- `Shell_size`: greater shell diameter, in mm
 
 The `colours_raw` dataset is another simple data frame with five columns:
 
@@ -75,11 +82,19 @@ points <- points_raw |>
 
 We then combine that with the other datasets:
 
-```{r make_final-data}
-data <- nematodes_raw |> 
+```{r make_final-data1}
+tab <- nematodes_raw |> 
   left_join(colours_raw) |> 
+  left_join(size_raw) |> 
   left_join(points) |> 
   mutate(has.nematodes=Nematodes>0)
+```
+
+
+```{r make_final-data2}
+data <- drop_na(tab)
+
+filter(tab,is.na(Shell_size) | is.na(Nematodes)) # check the dropped rows
 ```
 
 ## Misc numbers
@@ -90,12 +105,14 @@ Here we generate some interesting quantities for the Methods section
 cat(
   "\n",
   paste0("Number of sites visited: ",dim(points)[1],"\n"),
-  paste0("------ of snails: ",dim(data)[1],"\n"), # number of snails
-  paste0("------ of sites with snails found: ",length(unique(data$Population)),"\n"),
-  paste0("------ of snails scanned for nematodes (i.e. excluding missing snails): ",sum(!is.na(data$Nematodes)),"\n"),
-  paste0("------ of sites with snails, after accounting for lost snails: ",length(unique(na.omit(data)$Population)),"\n" ),
-  paste0("------ of snails with nematodes: ", sum(data$has.nematodes,na.rm=TRUE), "\n"),
-  paste0("------ of nematodes found across all shells: ",sum(data$Nematodes,na.rm=TRUE))
+  paste0("------ of snails: ",dim(tab)[1],"\n"), # number of snails
+  paste0("------ of sites with snails found: ",length(unique(tab$Population)),"\n"),
+  paste0("------ of snails scanned for nematodes (i.e. excluding missing snails): ",length(data$Population),"\n"),
+  paste0("------ of sites with snails, after accounting for lost snails: ",length(unique(data$Population)),"\n" ),
+  paste0("------ of all snails with nematodes: ", sum(tab$has.nematodes,na.rm=TRUE), "\n"),
+  paste0("------ of non-NA snails with nematodes: ", sum(data$has.nematodes,na.rm=TRUE), "\n"),
+  paste0("------ of nematodes found across all shells: ",sum(tab$Nematodes,na.rm=TRUE)),
+  paste0("------ of nematodes found across shells with no missing data: ",sum(data$Nematodes,na.rm=TRUE))
 )
 ```
 
@@ -125,8 +142,6 @@ successful_points <- points |> filter(Population %in% data$Population)
 table(successful_points$City)    # spread of sites with Cepaea between cities
 ```
 
-
-
 ```{r misc-numbers4}
 nearest <- st_nearest_feature(successful_points)
 nearest_dist <- st_distance(successful_points, successful_points[nearest,], by_element=TRUE)
@@ -141,15 +156,64 @@ We can now move to running the models.
 
 # Models
 
+## Models without size
+
+(these models are an internal check that we get the same qualitative conclusions for urbanisation by including size vs not, despite size having one missing value _ see above_ and therefore reducing the dataset size by one if we include it in model)
+```{r models0}
+mod_built100_a <- glmmTMB(has.nematodes~scale(BUILT100)+City+
+                          col+scale(nbands)+fusion+
+                          (1|Population),data=tab,family=binomial)
+
+mod_built1000_a <- glmmTMB(has.nematodes~scale(BUILT1000)+City+
+                           col+scale(nbands)+fusion+
+                           (1|Population),data=data,family=binomial)
+
+mod_pop100_a <- glmmTMB(has.nematodes~scale(POP100)+City+
+                        col+scale(nbands)+fusion+
+                        (1|Population),data=tab,family=binomial)
+
+mod_pop1000_a <- glmmTMB(has.nematodes~scale(POP1000)+City+
+                         col+scale(nbands)+fusion+
+                         (1|Population),data=tab,family=binomial)
+
+mod_SMOD_a <- glmmTMB(has.nematodes~SMOD_type+City+
+                      col+scale(nbands)+fusion+
+                      (1|Population),data=tab,family=binomial)
+
+mod_null_a <- glmmTMB(has.nematodes~City+
+                      col+scale(nbands)+fusion+
+                      (1|Population),data=tab,family=binomial)
+# we use glmmTMB() rather than lme4::glmer() because some models have convergence issues on the latter
+# easy to check that the models with no issues give the same thing (to several decimals) on both packages
+
+```
+
+## Models with size
+
 ```{r models}
-mod_built100 <- glmmTMB(has.nematodes~scale(BUILT100)+City+col+scale(nbands)+fusion+(1|Population),data=data,family=binomial)
-mod_built1000 <- glmmTMB(has.nematodes~scale(BUILT1000)+City+col+scale(nbands)+fusion+(1|Population),data=data,family=binomial)
-mod_pop100 <- glmmTMB(has.nematodes~scale(POP100)+City+col+scale(nbands)+fusion+(1|Population),data=data,family=binomial)
-mod_pop1000 <- glmmTMB(has.nematodes~scale(POP1000)+City+col+scale(nbands)+fusion+(1|Population),data=data,family=binomial)
+mod_built100 <- glmmTMB(has.nematodes~scale(BUILT100)+City+
+                          col+scale(nbands)+fusion+scale(Shell_size)+
+                          (1|Population),data=data,family=binomial)
 
-mod_SMOD <- glmmTMB(has.nematodes~SMOD_type+City+col+nbands+fusion+(1|Population),data=data,family=binomial)
+mod_built1000 <- glmmTMB(has.nematodes~scale(BUILT1000)+City+
+                           col+scale(nbands)+fusion+scale(Shell_size)+
+                           (1|Population),data=data,family=binomial)
 
-mod_null <- glmmTMB(has.nematodes~City+col+nbands+fusion+(1|Population),data=data,family=binomial)
+mod_pop100 <- glmmTMB(has.nematodes~scale(POP100)+City+
+                        col+scale(nbands)+fusion+scale(Shell_size)+
+                        (1|Population),data=data,family=binomial)
+
+mod_pop1000 <- glmmTMB(has.nematodes~scale(POP1000)+City+
+                         col+scale(nbands)+fusion+scale(Shell_size)+
+                         (1|Population),data=data,family=binomial)
+
+mod_SMOD <- glmmTMB(has.nematodes~SMOD_type+City+
+                      col+scale(nbands)+fusion+scale(Shell_size)+
+                      (1|Population),data=data,family=binomial)
+
+mod_null <- glmmTMB(has.nematodes~City+col+
+                      scale(nbands)+fusion+scale(Shell_size)+
+                      (1|Population),data=data,family=binomial)
 # we use glmmTMB() rather than lme4::glmer() because some models have convergence issues on the latter
 # easy to check that the models with no issues give the same thing (to several decimals) on both packages
 
@@ -166,9 +230,16 @@ plot(simres)
 ## model comparison
 
 ```{r model-selection}
+mtable_a <- model.sel(mod_built100_a,mod_built1000_a,mod_pop100_a,mod_pop1000_a,mod_SMOD_a,mod_null_a,rank="AICc")
 mtable <- model.sel(mod_built100,mod_built1000,mod_pop100,mod_pop1000,mod_SMOD,mod_null,rank="AICc")
 
+mtable_a
+mtable
+```
 
+Both the model set with size effects and the model set without size effects (but one more datapoint) rank models in the same order, with very similar AICc weights
+
+```{r model-selection}
 tibble(
   model_name = row.names(mtable),
   df=mtable$df,
@@ -207,7 +278,6 @@ We can move forward with our model then :)
 # Model analysis
 
 ```{r model-test}
-
 r.squaredGLMM(mod_SMOD)
 Anova(mod_SMOD)
 
@@ -215,6 +285,8 @@ contrast(emmeans(mod_SMOD,specs = ~ SMOD_type),method="pairwise")
 
 preds <- emmeans(mod_SMOD,specs = ~ SMOD_type, type="response") |> 
   as_tibble() 
+
+preds
 ```
 
 # Plot
@@ -232,3 +304,22 @@ ggplot() +
   labs(x="Degree of Urbanisation (GHS-SMOD, 1km grid cell)", y = "Proportion of shells with nematodes")+
   theme_bw()
 ```
+
+
+
+```{r plot}
+aggregated_data_size <- data |> 
+  as_tibble() |> select(-geom) |> 
+  mutate(Shell_size=round(Shell_size)) |> 
+  group_by(Shell_size,SMOD_type) |>
+  summarise(N_nema=sum(has.nematodes,na.rm=TRUE),N=sum(!is.na(has.nematodes)))
+
+ggplot() + 
+  geom_point(data=aggregated_data_size,aes(Shell_size,N_nema/N,size=N),col="darkgrey") + facet_wrap(~SMOD_type)
+  geom_pointrange(data = preds, aes(x=SMOD_type,y=prob,ymin=asymp.LCL,ymax=asymp.UCL),size=1,pch=21,fill="white")+ 
+  scale_size_area("Number of snails") + 
+  labs(x="Degree of Urbanisation (GHS-SMOD, 1km grid cell)", y = "Proportion of shells with nematodes")+
+  theme_bw()
+```
+
+
