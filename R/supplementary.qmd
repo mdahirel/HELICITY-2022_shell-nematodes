@@ -1,5 +1,5 @@
 ---
-title: "_Cepaea nemoralis_ snails are less likely to trap nematodes within their shells in urban areas - supplementary material"
+title: "Urban _Cepaea nemoralis_ snails are less likely to have nematodes trapped within their shells - supplementary material"
 author: "Maxime Dahirel, Hannah Reyné, Katrien De Wolf, Dries Bonte"
 bibliography: references.bib
 format: pdf
@@ -33,6 +33,8 @@ library(here)        # CRAN v1.0.1
 nematodes_raw <- read_csv(here("data","HELICITY22_nematodes.csv"))
 colours_raw <- read_csv(here("data","HELICITY22_shellcolours.csv"))
 
+size_raw <- read_csv(here("data","HELICITY22_shellsize.csv"))
+
 points_raw <- st_read(here("data","HELICITY22_sites_BELambert72_wGHSL.gpkg")) 
 ```
 
@@ -44,7 +46,7 @@ We show here (**Figs S1-1 and S1-2**) the relationships in our sites between the
 
 - Urban Centre sites contain a much broader range of variation in either variable, compared to intermediate and rural sites;  
 
-- Interestingly, the differences in built-up surfaces between the three Degree of Urbanisation classes map almost exactly to built-up thresholds designed and used independently in a series of urban ecology studies from Belgian sites [e.g. @merckxIncreasedBodySize2018; @pianoUrbanizationDrivesCrosstaxon2020] (**Fig. S1-2**). Degree of Urbanisation classes can therefore (_for our data_) be interpreted as encoding both variation in density and in built-up surfaces. 
+- Interestingly, the differences in built-up surfaces between the three Degree of Urbanisation classes map very closely to built-up thresholds designed and used independently in a series of urban ecology studies from Belgian sites [e.g. @merckxIncreasedBodySize2018; @pianoUrbanizationDrivesCrosstaxon2020] (**Fig. S1-2**). Degree of Urbanisation classes can therefore (_for our data_) be interpreted as encoding both variation in density and in built-up surfaces. 
 
 
 ```{r load-points}
@@ -112,7 +114,9 @@ ggplot(points)+
 #| output: false
 infected <- nematodes_raw |> 
   left_join(colours_raw) |> 
+  left_join(size_raw) |> 
   left_join(points) |> 
+  drop_na() |> 
   filter(Nematodes > 0) |>
   mutate(Nematodes_minus_1 = Nematodes - 1)  # so the test variable for count models stays bounded at 0
 # we're effectively modelling the nematodes "in excess" of the minimum 1 needed to be in this sub-dataset
@@ -127,16 +131,19 @@ Using the subset of shells where nematodes were detected, we ran a negative bino
 #| echo: false
 #| message: false
 #| output: false
-mod=glmmTMB(Nematodes_minus_1 ~ SMOD_type + City + col+scale(nbands)+fusion + (1|Population),data=infected, family=poisson)
+mod=glmmTMB(Nematodes_minus_1 ~ SMOD_type + City + col+scale(nbands)+
+              scale(Shell_size) + fusion + (1|Population),data=infected, family=poisson)
 
 plot(simulateResiduals(mod))
 testDispersion(simulateResiduals(mod),alternative="greater")
 testDispersion(simulateResiduals(mod),type="PearsonChisq",alternative="greater")
-check_overdispersion(mod) # conflict between parametric and non parametric; let's assume overdispersion to be safe
+check_overdispersion(mod) 
+# conflict between parametric and non parametric overdispersion tests; let's assume overdispersion to be safe
 ## NB: saving the performance::check_overdispersion() test as an object and exploring it with str() confirms it's the same as
 ## DHARMa::testDispersion(type="PearsonChisq",alternative="greater")
 
-mod=glmmTMB(Nematodes_minus_1 ~ SMOD_type + City + col+scale(nbands)+fusion + (1|Population),data=infected, family=nbinom2)
+mod=glmmTMB(Nematodes_minus_1 ~ SMOD_type + City + col+scale(nbands)+
+              scale(Shell_size) + fusion + (1|Population),data=infected, family=nbinom2)
 plot(simulateResiduals(mod))
 testDispersion(simulateResiduals(mod),alternative="greater")
 testDispersion(simulateResiduals(mod),type="PearsonChisq",alternative="greater")
@@ -162,6 +169,7 @@ Anova(mod) |>
   mutate(variable=case_when(
     variable=="SMOD_type"~"Degree of Urbanisation",
     variable=="City"~"City",
+    variable=="scale(Shell_size)"~"Shell size",
     variable=="col"~"Shell background colour",
     variable=="scale(nbands)"~"Number of bands",
     variable=="fusion"~"Band fusion"

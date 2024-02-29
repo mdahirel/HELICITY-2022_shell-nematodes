@@ -1,5 +1,5 @@
 ---
-title: "*Cepaea nemoralis* snails are less likely to trap nematodes within their shells in urban areas - main analysis"
+title: "Urban _Cepaea nemoralis_ snails are less likely to have nematodes trapped within their shells - main analysis"
 author: "Maxime Dahirel"
 format: html
 editor_options: 
