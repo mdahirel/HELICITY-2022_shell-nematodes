@@ -166,7 +166,7 @@ mod_built100_a <- glmmTMB(has.nematodes~scale(BUILT100)+City+
 
 mod_built1000_a <- glmmTMB(has.nematodes~scale(BUILT1000)+City+
                            col+scale(nbands)+fusion+
-                           (1|Population),data=data,family=binomial)
+                           (1|Population),data=tab,family=binomial)
 
 mod_pop100_a <- glmmTMB(has.nematodes~scale(POP100)+City+
                         col+scale(nbands)+fusion+
@@ -304,22 +304,4 @@ ggplot() +
   labs(x="Degree of Urbanisation (GHS-SMOD, 1km grid cell)", y = "Proportion of shells with nematodes")+
   theme_bw()
 ```
-
-
-
-```{r plot}
-aggregated_data_size <- data |> 
-  as_tibble() |> select(-geom) |> 
-  mutate(Shell_size=round(Shell_size)) |> 
-  group_by(Shell_size,SMOD_type) |>
-  summarise(N_nema=sum(has.nematodes,na.rm=TRUE),N=sum(!is.na(has.nematodes)))
-
-ggplot() + 
-  geom_point(data=aggregated_data_size,aes(Shell_size,N_nema/N,size=N),col="darkgrey") + facet_wrap(~SMOD_type)
-  geom_pointrange(data = preds, aes(x=SMOD_type,y=prob,ymin=asymp.LCL,ymax=asymp.UCL),size=1,pch=21,fill="white")+ 
-  scale_size_area("Number of snails") + 
-  labs(x="Degree of Urbanisation (GHS-SMOD, 1km grid cell)", y = "Proportion of shells with nematodes")+
-  theme_bw()
-```
-
 
