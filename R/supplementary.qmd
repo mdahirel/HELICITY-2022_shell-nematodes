@@ -1,5 +1,5 @@
 ---
-title: "Urban _Cepaea nemoralis_ snails are less likely to have nematodes trapped within their shells - supplementary material"
+title: "_Cepaea nemoralis_ snails are less likely to trap nematodes within their shells in urban areas - supplementary material"
 author: "Maxime Dahirel, Hannah Reyné, Katrien De Wolf, Dries Bonte"
 bibliography: references.bib
 format: pdf
@@ -7,35 +7,32 @@ editor_options:
   chunk_output_type: console
 ---
 
-
 ```{r packages}
 #| echo: false
 #| message: false
 #| output: false
-#| 
-library(car)         # CRAN v3.1-2
-library(DHARMa)      # CRAN v0.4.6
-library(emmeans)     # CRAN v1.9.0
-library(ggtext)      # CRAN v0.1.2
-library(glmmTMB)     # CRAN v1.1.8
-library(performance) # CRAN v0.10.8
-library(sf)          # CRAN v1.0-15
+#|
+library(car) # CRAN v3.1-2
+library(DHARMa) # CRAN v0.4.6
+library(emmeans) # CRAN v1.10.0
+library(ggtext) # CRAN v0.1.2
+library(glmmTMB) # CRAN v1.1.8
+library(performance) # CRAN v0.10.9
+library(sf) # CRAN v1.0-15
 
-library(tidyverse)   # CRAN v2.0.0
+library(tidyverse) # CRAN v2.0.0
 
-library(here)        # CRAN v1.0.1
+library(here) # CRAN v1.0.1
 ```
 
 ```{r data}
 #| echo: false
 #| message: false
 #| output: false
-nematodes_raw <- read_csv(here("data","HELICITY22_nematodes.csv"))
-colours_raw <- read_csv(here("data","HELICITY22_shellcolours.csv"))
+nematodes_raw <- read_csv(here("data", "HELICITY22_nematodes.csv"))
+colours_raw <- read_csv(here("data", "HELICITY22_shellcolours.csv"))
 
-size_raw <- read_csv(here("data","HELICITY22_shellsize.csv"))
-
-points_raw <- st_read(here("data","HELICITY22_sites_BELambert72_wGHSL.gpkg")) 
+points_raw <- st_read(here("data", "HELICITY22_sites_BELambert72_wGHSL.gpkg"))
 ```
 
 # S1 - Variation in human population density and in built-up surfaces between Degrees of Urbanisation
@@ -46,32 +43,36 @@ We show here (**Figs S1-1 and S1-2**) the relationships in our sites between the
 
 - Urban Centre sites contain a much broader range of variation in either variable, compared to intermediate and rural sites;  
 
-- Interestingly, the differences in built-up surfaces between the three Degree of Urbanisation classes map very closely to built-up thresholds designed and used independently in a series of urban ecology studies from Belgian sites [e.g. @merckxIncreasedBodySize2018; @pianoUrbanizationDrivesCrosstaxon2020] (**Fig. S1-2**). Degree of Urbanisation classes can therefore (_for our data_) be interpreted as encoding both variation in density and in built-up surfaces. 
+- Interestingly, the differences in built-up surfaces between the three Degree of Urbanisation classes map almost exactly to built-up thresholds designed and used independently in a series of urban ecology studies from Belgian sites [e.g. @merckxIncreasedBodySize2018; @pianoUrbanizationDrivesCrosstaxon2020] (**Fig. S1-2**). Degree of Urbanisation classes can therefore (_for our data_) be interpreted as encoding both variation in density and in built-up surfaces. 
 
 
 ```{r load-points}
 #| echo: false
 #| message: false
 #| output: false
-points <- st_read(here("data","HELICITY22_sites_BELambert72_wGHSL.gpkg")) |> 
-  mutate(x=st_coordinates(geom)[,1],
-         y=st_coordinates(geom)[,2]) |> 
+points <- st_read(here("data", "HELICITY22_sites_BELambert72_wGHSL.gpkg")) |>
   mutate(
-    SMOD_type =  case_when(SMOD ==30 ~ "3 - Urban Centre",
-                      (SMOD >= 20 & SMOD < 30) ~ "2 - Intermediate",
-                      (SMOD > 10 & SMOD < 20) ~ "1 - Rural",
-                      SMOD == 10 ~ "0 - Water bodies",
-                      T ~ NA_character_)
+    x = st_coordinates(geom)[, 1],
+    y = st_coordinates(geom)[, 2]
+  ) |>
+  mutate(
+    SMOD_type = case_when(
+      SMOD == 30 ~ "3 - Urban Centre",
+      (SMOD >= 20 & SMOD < 30) ~ "2 - Intermediate",
+      (SMOD > 10 & SMOD < 20) ~ "1 - Rural",
+      SMOD == 10 ~ "0 - Water bodies",
+      T ~ NA_character_
+    )
   )
 ```
 
 ```{r s1-plot-1}
 #| echo: false
-ggplot(points)+
-  geom_boxplot(aes(SMOD_type,POP1000))+ 
-  #geom_hline(yintercept=c(300,1500),lty=2)+
-  labs(x="Degree of Urbanisation (GHS-SMOD, 1km grid cell)", y = "Population density in grid cell (people/km^2^)")+
-  theme_bw() + 
+ggplot(points) +
+  geom_boxplot(aes(SMOD_type, POP1000)) +
+  # geom_hline(yintercept=c(300,1500),lty=2)+
+  labs(x = "Degree of Urbanisation (GHS-SMOD, 1km grid cell)", y = "Population density in grid cell (people/km^2^)") +
+  theme_bw() +
   theme(axis.title.y = element_markdown())
 ```
 
@@ -82,26 +83,26 @@ ggplot(points)+
 #| message: false
 #| output: false
 SPEEDY_threshold <- tibble( ## from e.g. Piano et al papers
-  ymin=c(0,0.05,0.15),
-  ymax=c(0.03,0.1,1),
-  ylab=c(0.015,0.075,0.45),
-  SPEEDY_type=c("1 - low built-up","2 - medium built-up","3 - high built-up")
+  ymin = c(0, 0.05, 0.15),
+  ymax = c(0.03, 0.1, 1),
+  ylab = c(0.015, 0.075, 0.45),
+  SPEEDY_type = c("1 - low built-up", "2 - medium built-up", "3 - high built-up")
 )
 ```
 
 
 ```{r s1-plot-2}
 #| echo: false
-ggplot(points)+
-  geom_boxplot(aes(SMOD_type,BUILT1000/(1000*1000)))+ 
-  geom_ribbon(data=SPEEDY_threshold |> expand_grid(x=c(-1:5)),aes(x=x,ymin=ymin,ymax=ymax,fill=SPEEDY_type), alpha=0.5)+
-  geom_boxplot(aes(SMOD_type,BUILT1000/(1000*1000)))+ 
-  geom_label(data=SPEEDY_threshold,aes(x=4,y=ylab,label=SPEEDY_type),hjust=1)+
-  labs(x="Degree of Urbanisation (GHS-SMOD, 1km grid cell)", y = "Proportion built-up within 1km grid cell")+
-  scale_fill_brewer(type="seq")+
-  coord_cartesian(ylim=c(0,0.5),xlim=c(0.5,3.5)) + 
-  theme_bw()+theme(legend.position = "none")
-
+ggplot(points) +
+  geom_boxplot(aes(SMOD_type, BUILT1000 / (1000 * 1000))) +
+  geom_ribbon(data = SPEEDY_threshold |> expand_grid(x = c(-1:5)), aes(x = x, ymin = ymin, ymax = ymax, fill = SPEEDY_type), alpha = 0.5) +
+  geom_boxplot(aes(SMOD_type, BUILT1000 / (1000 * 1000))) +
+  geom_label(data = SPEEDY_threshold, aes(x = 4, y = ylab, label = SPEEDY_type), hjust = 1) +
+  labs(x = "Degree of Urbanisation (GHS-SMOD, 1km grid cell)", y = "Proportion built-up within 1km grid cell") +
+  scale_fill_brewer(type = "seq") +
+  coord_cartesian(ylim = c(0, 0.5), xlim = c(0.5, 3.5)) +
+  theme_bw() +
+  theme(legend.position = "none")
 ```
 
 **Figure S1-2.** Relationship between Degree of Urbanisation classes and built-up surfaces, for all 36 visited sites (including sites with no snails found). Shaded areas and corresponding labels mark the limits of the three urban classes used in studies from the Belgian SPEEDY project, including for instance @merckxIncreasedBodySize2018 or @pianoUrbanizationDrivesCrosstaxon2020.
@@ -112,13 +113,11 @@ ggplot(points)+
 #| echo: false
 #| message: false
 #| output: false
-infected <- nematodes_raw |> 
-  left_join(colours_raw) |> 
-  left_join(size_raw) |> 
-  left_join(points) |> 
-  drop_na() |> 
+infected <- nematodes_raw |>
+  left_join(colours_raw) |>
+  left_join(points) |>
   filter(Nematodes > 0) |>
-  mutate(Nematodes_minus_1 = Nematodes - 1)  # so the test variable for count models stays bounded at 0
+  mutate(Nematodes_minus_1 = Nematodes - 1) # so the test variable for count models stays bounded at 0
 # we're effectively modelling the nematodes "in excess" of the minimum 1 needed to be in this sub-dataset
 ```
 
@@ -131,25 +130,22 @@ Using the subset of shells where nematodes were detected, we ran a negative bino
 #| echo: false
 #| message: false
 #| output: false
-mod=glmmTMB(Nematodes_minus_1 ~ SMOD_type + City + col+scale(nbands)+
-              scale(Shell_size) + fusion + (1|Population),data=infected, family=poisson)
+mod <- glmmTMB(Nematodes_minus_1 ~ SMOD_type + City + col + scale(nbands) + fusion + (1 | Population), data = infected, family = poisson)
 
 plot(simulateResiduals(mod))
-testDispersion(simulateResiduals(mod),alternative="greater")
-testDispersion(simulateResiduals(mod),type="PearsonChisq",alternative="greater")
-check_overdispersion(mod) 
-# conflict between parametric and non parametric overdispersion tests; let's assume overdispersion to be safe
+testDispersion(simulateResiduals(mod), alternative = "greater")
+testDispersion(simulateResiduals(mod), type = "PearsonChisq", alternative = "greater")
+check_overdispersion(mod) # conflict between parametric and non parametric; let's assume overdispersion to be safe
 ## NB: saving the performance::check_overdispersion() test as an object and exploring it with str() confirms it's the same as
 ## DHARMa::testDispersion(type="PearsonChisq",alternative="greater")
 
-mod=glmmTMB(Nematodes_minus_1 ~ SMOD_type + City + col+scale(nbands)+
-              scale(Shell_size) + fusion + (1|Population),data=infected, family=nbinom2)
+mod <- glmmTMB(Nematodes_minus_1 ~ SMOD_type + City + col + scale(nbands) + fusion + (1 | Population), data = infected, family = nbinom2)
 plot(simulateResiduals(mod))
-testDispersion(simulateResiduals(mod),alternative="greater")
-testDispersion(simulateResiduals(mod),type="PearsonChisq",alternative="greater")
+testDispersion(simulateResiduals(mod), alternative = "greater")
+testDispersion(simulateResiduals(mod), type = "PearsonChisq", alternative = "greater")
 performance::check_overdispersion(mod) # no conflict anymore
 
-preds_infected <- emmeans(mod,specs = ~ SMOD_type, type="response") |> 
+preds_infected <- emmeans(mod, specs = ~SMOD_type, type = "response") |>
   as_tibble()
 ```
 
@@ -160,32 +156,30 @@ preds_infected <- emmeans(mod,specs = ~ SMOD_type, type="response") |>
 #| message: false
 #| warning: false
 
-Anova(mod) |> 
-  as.data.frame() |> 
-  mutate(Chisq = round(Chisq,2)) |> 
-  rename(`$\\Chi^2$`="Chisq",`_p_` = `Pr(>Chisq)`) |> 
-  mutate(`_p_` = round(`_p_`,2)) |> 
-  rownames_to_column(var="variable") |> 
-  mutate(variable=case_when(
-    variable=="SMOD_type"~"Degree of Urbanisation",
-    variable=="City"~"City",
-    variable=="scale(Shell_size)"~"Shell size",
-    variable=="col"~"Shell background colour",
-    variable=="scale(nbands)"~"Number of bands",
-    variable=="fusion"~"Band fusion"
-  )) |> 
+Anova(mod) |>
+  as.data.frame() |>
+  mutate(Chisq = round(Chisq, 2)) |>
+  rename(`$\\Chi^2$` = "Chisq", `_p_` = `Pr(>Chisq)`) |>
+  mutate(`_p_` = round(`_p_`, 2)) |>
+  rownames_to_column(var = "variable") |>
+  mutate(variable = case_when(
+    variable == "SMOD_type" ~ "Degree of Urbanisation",
+    variable == "City" ~ "City",
+    variable == "col" ~ "Shell background colour",
+    variable == "scale(nbands)" ~ "Number of bands",
+    variable == "fusion" ~ "Band fusion"
+  )) |>
   knitr::kable()
-
 ```
 
 
 ```{r s2-plot}
 #| echo: false
-ggplot(infected) + 
-  geom_point(aes(SMOD_type,Nematodes),position = position_jitter(width=0.3,height=0),col="darkgrey") + 
-  geom_pointrange(data = preds_infected, aes(x=SMOD_type,y=response + 1,ymin=asymp.LCL + 1,ymax=asymp.UCL + 1),size=1,pch=21,fill="white") +
-  labs(x="Urbanisation type (SMOD, 1km grid)", y = "Number of nematodes per shell")+
-  scale_y_log10()+
+ggplot(infected) +
+  geom_point(aes(SMOD_type, Nematodes), position = position_jitter(width = 0.3, height = 0), col = "darkgrey") +
+  geom_pointrange(data = preds_infected, aes(x = SMOD_type, y = response + 1, ymin = asymp.LCL + 1, ymax = asymp.UCL + 1), size = 1, pch = 21, fill = "white") +
+  labs(x = "Urbanisation type (SMOD, 1km grid)", y = "Number of nematodes per shell") +
+  scale_y_log10() +
   theme_bw()
 ```
 

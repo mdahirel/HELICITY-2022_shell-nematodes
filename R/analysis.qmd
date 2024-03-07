@@ -7,17 +7,17 @@ editor_options:
 ---
 
 ```{r packages}
-library(car)       # CRAN v3.1-2
-library(DHARMa)    # CRAN v0.4.6
-library(emmeans)   # CRAN v1.9.0
-library(glmmTMB)   # CRAN v1.1.8
-library(MuMIn)     # CRAN v1.47.5
-library(ncf)       # CRAN v1.3-2
-library(sf)        # CRAN v1.0-15
+library(car) # CRAN v3.1-2
+library(DHARMa) # CRAN v0.4.6
+library(emmeans) # CRAN v1.10.0
+library(glmmTMB) # CRAN v1.1.8
+library(MuMIn) # CRAN v1.47.5
+library(ncf) # CRAN v1.3-2
+library(sf) # CRAN v1.0-15
 
 library(tidyverse) # CRAN v2.0.0
 
-library(here)      # CRAN v1.0.1
+library(here) # CRAN v1.0.1
 ```
 
 # Loading data
@@ -25,12 +25,12 @@ library(here)      # CRAN v1.0.1
 We first load our snail data and our environmental data:
 
 ```{r data}
-nematodes_raw <- read_csv(here("data","HELICITY22_nematodes.csv"))
-colours_raw <- read_csv(here("data","HELICITY22_shellcolours.csv"))
+nematodes_raw <- read_csv(here("data", "HELICITY22_nematodes.csv"))
+colours_raw <- read_csv(here("data", "HELICITY22_shellcolours.csv"))
 
-size_raw <- read_csv(here("data","HELICITY22_shellsize.csv"))
+size_raw <- read_csv(here("data", "HELICITY22_shellsize.csv"))
 
-points_raw <- st_read(here("data","HELICITY22_sites_BELambert72_wGHSL.gpkg")) 
+points_raw <- st_read(here("data", "HELICITY22_sites_BELambert72_wGHSL.gpkg"))
 ```
 
 The `nematodes_raw` dataset is a simple data frame with three columns:
@@ -42,7 +42,7 @@ The `nematodes_raw` dataset is a simple data frame with three columns:
 The `size_raw` dataset contains three columns:
 
 - `Population` and `Individual_ID` as above
-- `Shell_size`: greater shell diameter, in mm
+- `Shell_size`: greater shell diameter, in mm. NAs are cases where a snail that was collected was accidentally broken before it could be measured or photographed
 
 The `colours_raw` dataset is another simple data frame with five columns:
 
@@ -68,33 +68,37 @@ The `points_raw` dataset is a geopackage containing the point locations for each
 We extract XY coordinates (for spatial autocorrelation tests) and convert SMOD values to their corresponding upper levels types (see references in main text Methods):
 
 ```{r process_spatial-data}
-points <- points_raw |> 
-  mutate(x=st_coordinates(geom)[,1],
-         y=st_coordinates(geom)[,2]) |> 
+points <- points_raw |>
   mutate(
-    SMOD_type =  case_when(SMOD ==30 ~ "3 - Urban Centre",
-                      (SMOD >= 20 & SMOD < 30) ~ "2 - Intermediate",
-                      (SMOD > 10 & SMOD < 20) ~ "1 - Rural",
-                      SMOD == 10 ~ "0 - Water bodies",
-                      T ~ NA_character_)
+    x = st_coordinates(geom)[, 1],
+    y = st_coordinates(geom)[, 2]
+  ) |>
+  mutate(
+    SMOD_type = case_when(
+      SMOD == 30 ~ "3 - Urban Centre",
+      (SMOD >= 20 & SMOD < 30) ~ "2 - Intermediate",
+      (SMOD > 10 & SMOD < 20) ~ "1 - Rural",
+      SMOD == 10 ~ "0 - Water bodies",
+      T ~ NA_character_
+    )
   )
 ```
 
 We then combine that with the other datasets:
 
 ```{r make_final-data1}
-tab <- nematodes_raw |> 
-  left_join(colours_raw) |> 
-  left_join(size_raw) |> 
-  left_join(points) |> 
-  mutate(has.nematodes=Nematodes>0)
+tab <- nematodes_raw |>
+  left_join(colours_raw) |>
+  left_join(size_raw) |>
+  left_join(points) |>
+  mutate(has.nematodes = Nematodes > 0)
 ```
 
 
 ```{r make_final-data2}
 data <- drop_na(tab)
 
-filter(tab,is.na(Shell_size) | is.na(Nematodes)) # check the dropped rows
+filter(tab, is.na(Shell_size) | is.na(Nematodes)) # check the dropped rows
 ```
 
 ## Misc numbers
@@ -104,15 +108,15 @@ Here we generate some interesting quantities for the Methods section
 ```{r misc-numbers1}
 cat(
   "\n",
-  paste0("Number of sites visited: ",dim(points)[1],"\n"),
-  paste0("------ of snails: ",dim(tab)[1],"\n"), # number of snails
-  paste0("------ of sites with snails found: ",length(unique(tab$Population)),"\n"),
-  paste0("------ of snails scanned for nematodes (i.e. excluding missing snails): ",length(data$Population),"\n"),
-  paste0("------ of sites with snails, after accounting for lost snails: ",length(unique(data$Population)),"\n" ),
-  paste0("------ of all snails with nematodes: ", sum(tab$has.nematodes,na.rm=TRUE), "\n"),
-  paste0("------ of non-NA snails with nematodes: ", sum(data$has.nematodes,na.rm=TRUE), "\n"),
-  paste0("------ of nematodes found across all shells: ",sum(tab$Nematodes,na.rm=TRUE)),
-  paste0("------ of nematodes found across shells with no missing data: ",sum(data$Nematodes,na.rm=TRUE))
+  paste0("Number of sites visited: ", dim(points)[1], "\n"),
+  paste0("------ of snails: ", dim(tab)[1], "\n"), # number of snails
+  paste0("------ of sites with snails found: ", length(unique(tab$Population)), "\n"),
+  paste0("------ of snails scanned for nematodes (i.e. excluding missing snails): ", length(data$Population), "\n"),
+  paste0("------ of sites with snails, after accounting for lost snails: ", length(unique(data$Population)), "\n"),
+  paste0("------ of all snails with nematodes: ", sum(tab$has.nematodes, na.rm = TRUE), "\n"),
+  paste0("------ of non-NA snails with nematodes: ", sum(data$has.nematodes, na.rm = TRUE), "\n"),
+  paste0("------ of nematodes found across all shells: ", sum(tab$Nematodes, na.rm = TRUE), "\n"),
+  paste0("------ of nematodes found across shells with no missing data: ", sum(data$Nematodes, na.rm = TRUE), "\n")
 )
 ```
 
@@ -120,35 +124,37 @@ cat(
 ```{r misc-numbers2}
 cat(
   "\n",
-  paste0("Collectors per site, mean: ",
-         round(mean(points$N_collectors),2),
-         ", SD: ",
-         round(sd(points$N_collectors),2),
-         ", range: ",min(points$N_collectors),"-",max(points$N_collectors), "\n"),
-  paste0("Effort in person-minutes per site, mean: ",
-         round(mean(points$Sampling_effort_minutes),2),
-         ", SD: ",
-         round(sd(points$Sampling_effort_minutes),2),
-         ", range: ", min(points$Sampling_effort_minutes),"-",max(points$Sampling_effort_minutes))
+  paste0(
+    "Collectors per site, mean: ",
+    round(mean(points$N_collectors), 2),
+    ", SD: ",
+    round(sd(points$N_collectors), 2),
+    ", range: ", min(points$N_collectors), "-", max(points$N_collectors), "\n"
+  ),
+  paste0(
+    "Effort in person-minutes per site, mean: ",
+    round(mean(points$Sampling_effort_minutes), 2),
+    ", SD: ",
+    round(sd(points$Sampling_effort_minutes), 2),
+    ", range: ", min(points$Sampling_effort_minutes), "-", max(points$Sampling_effort_minutes)
+  )
 )
 ```
 
-
-
 ```{r misc-numbers3}
-table(points$City)  # spread of visited sites between cities
+table(points$City) # spread of visited sites between cities
 
 successful_points <- points |> filter(Population %in% data$Population)
-table(successful_points$City)    # spread of sites with Cepaea between cities
+table(successful_points$City) # spread of sites with Cepaea between cities
 ```
 
 ```{r misc-numbers4}
 nearest <- st_nearest_feature(successful_points)
-nearest_dist <- st_distance(successful_points, successful_points[nearest,], by_element=TRUE)
+nearest_dist <- st_distance(successful_points, successful_points[nearest, ], by_element = TRUE)
 
 cat(
   "for sites with snails found, the distance to the nearest site with also snails found \nis on average",
-  round(mean(nearest_dist),2),"m \nwith a range of ", paste0(round(min(nearest_dist),2),"-",round(max(nearest_dist),2))
+  round(mean(nearest_dist), 2), "m \nwith a range of ", paste0(round(min(nearest_dist), 2), "-", round(max(nearest_dist), 2))
 )
 ```
 
@@ -158,65 +164,64 @@ We can now move to running the models.
 
 ## Models without size
 
-(these models are an internal check that we get the same qualitative conclusions for urbanisation by including size vs not, despite size having one missing value _ see above_ and therefore reducing the dataset size by one if we include it in model)
+(these models are not used in the manuscript, and are here as an internal check that we get the same qualitative conclusions for urbanisation by including size vs not, despite size having one missing value _ see above_ and therefore reducing the dataset size by one if we include it in model)
+
 ```{r models0}
-mod_built100_a <- glmmTMB(has.nematodes~scale(BUILT100)+City+
-                          col+scale(nbands)+fusion+
-                          (1|Population),data=tab,family=binomial)
+mod_built100_a <- glmmTMB(has.nematodes ~ scale(BUILT100) + City +
+  col + scale(nbands) + fusion +
+  (1 | Population), data = tab, family = binomial)
 
-mod_built1000_a <- glmmTMB(has.nematodes~scale(BUILT1000)+City+
-                           col+scale(nbands)+fusion+
-                           (1|Population),data=tab,family=binomial)
+mod_built1000_a <- glmmTMB(has.nematodes ~ scale(BUILT1000) + City +
+  col + scale(nbands) + fusion +
+  (1 | Population), data = tab, family = binomial)
 
-mod_pop100_a <- glmmTMB(has.nematodes~scale(POP100)+City+
-                        col+scale(nbands)+fusion+
-                        (1|Population),data=tab,family=binomial)
+mod_pop100_a <- glmmTMB(has.nematodes ~ scale(POP100) + City +
+  col + scale(nbands) + fusion +
+  (1 | Population), data = tab, family = binomial)
 
-mod_pop1000_a <- glmmTMB(has.nematodes~scale(POP1000)+City+
-                         col+scale(nbands)+fusion+
-                         (1|Population),data=tab,family=binomial)
+mod_pop1000_a <- glmmTMB(has.nematodes ~ scale(POP1000) + City +
+  col + scale(nbands) + fusion +
+  (1 | Population), data = tab, family = binomial)
 
-mod_SMOD_a <- glmmTMB(has.nematodes~SMOD_type+City+
-                      col+scale(nbands)+fusion+
-                      (1|Population),data=tab,family=binomial)
+mod_SMOD_a <- glmmTMB(has.nematodes ~ SMOD_type + City +
+  col + scale(nbands) + fusion +
+  (1 | Population), data = tab, family = binomial)
 
-mod_null_a <- glmmTMB(has.nematodes~City+
-                      col+scale(nbands)+fusion+
-                      (1|Population),data=tab,family=binomial)
+mod_null_a <- glmmTMB(has.nematodes ~ City +
+  col + scale(nbands) + fusion +
+  (1 | Population), data = tab, family = binomial)
 # we use glmmTMB() rather than lme4::glmer() because some models have convergence issues on the latter
 # easy to check that the models with no issues give the same thing (to several decimals) on both packages
-
 ```
 
 ## Models with size
 
 ```{r models}
-mod_built100 <- glmmTMB(has.nematodes~scale(BUILT100)+City+
-                          col+scale(nbands)+fusion+scale(Shell_size)+
-                          (1|Population),data=data,family=binomial)
+mod_built100 <- glmmTMB(has.nematodes ~ scale(BUILT100) + City +
+  col + scale(nbands) + fusion + scale(Shell_size) +
+  (1 | Population), data = data, family = binomial)
 
-mod_built1000 <- glmmTMB(has.nematodes~scale(BUILT1000)+City+
-                           col+scale(nbands)+fusion+scale(Shell_size)+
-                           (1|Population),data=data,family=binomial)
+mod_built1000 <- glmmTMB(has.nematodes ~ scale(BUILT1000) + City +
+  col + scale(nbands) + fusion + scale(Shell_size) +
+  (1 | Population), data = data, family = binomial)
 
-mod_pop100 <- glmmTMB(has.nematodes~scale(POP100)+City+
-                        col+scale(nbands)+fusion+scale(Shell_size)+
-                        (1|Population),data=data,family=binomial)
+mod_pop100 <- glmmTMB(has.nematodes ~ scale(POP100) + City +
+  col + scale(nbands) + fusion + scale(Shell_size) +
+  (1 | Population), data = data, family = binomial)
 
-mod_pop1000 <- glmmTMB(has.nematodes~scale(POP1000)+City+
-                         col+scale(nbands)+fusion+scale(Shell_size)+
-                         (1|Population),data=data,family=binomial)
+mod_pop1000 <- glmmTMB(has.nematodes ~ scale(POP1000) + City +
+  col + scale(nbands) + fusion + scale(Shell_size) +
+  (1 | Population), data = data, family = binomial)
 
-mod_SMOD <- glmmTMB(has.nematodes~SMOD_type+City+
-                      col+scale(nbands)+fusion+scale(Shell_size)+
-                      (1|Population),data=data,family=binomial)
+mod_SMOD <- glmmTMB(has.nematodes ~ SMOD_type + City +
+  col + scale(nbands) + fusion + scale(Shell_size) +
+  (1 | Population), data = data, family = binomial)
 
-mod_null <- glmmTMB(has.nematodes~City+col+
-                      scale(nbands)+fusion+scale(Shell_size)+
-                      (1|Population),data=data,family=binomial)
+mod_null <- glmmTMB(has.nematodes ~ City + col +
+  scale(nbands) + fusion + scale(Shell_size) +
+  (1 | Population), data = data, family = binomial)
 # we use glmmTMB() rather than lme4::glmer() because some models have convergence issues on the latter
 # easy to check that the models with no issues give the same thing (to several decimals) on both packages
-
 ```
 
 ## testing for model assumption
@@ -230,8 +235,8 @@ plot(simres)
 ## model comparison
 
 ```{r model-selection}
-mtable_a <- model.sel(mod_built100_a,mod_built1000_a,mod_pop100_a,mod_pop1000_a,mod_SMOD_a,mod_null_a,rank="AICc")
-mtable <- model.sel(mod_built100,mod_built1000,mod_pop100,mod_pop1000,mod_SMOD,mod_null,rank="AICc")
+mtable_a <- model.sel(mod_built100_a, mod_built1000_a, mod_pop100_a, mod_pop1000_a, mod_SMOD_a, mod_null_a, rank = "AICc")
+mtable <- model.sel(mod_built100, mod_built1000, mod_pop100, mod_pop1000, mod_SMOD, mod_null, rank = "AICc")
 
 mtable_a
 mtable
@@ -242,33 +247,37 @@ Both the model set with size effects and the model set without size effects (but
 ```{r model-selection}
 tibble(
   model_name = row.names(mtable),
-  df=mtable$df,
-  logLik=round(mtable$logLik,1),
-  AICc = round(mtable$AICc,1),
-  delta = round(mtable$delta,2),
-  weight = round(mtable$weight,2)
-) |> 
+  df = mtable$df,
+  logLik = round(mtable$logLik, 1),
+  AICc = round(mtable$AICc, 1),
+  delta = round(mtable$delta, 2),
+  weight = round(mtable$weight, 2)
+) |>
   knitr::kable()
 ```
 
 
-And there is no spatial autocorrelation to worry about
+And there is no spatial autocorrelation to worry about:
 ```{r model-check2}
-correlog <- spline.correlog (x = data$x/1000, y = data$y/1000,
-                             z = residuals(mod_SMOD, type = "pearson"))
+correlog <- spline.correlog(
+  x = data$x / 1000, y = data$y / 1000,
+  z = residuals(mod_SMOD, type = "pearson")
+)
 
 plot(correlog) # no evidence of residual autocorrelation
 
 # calculating per group
-groupLocations = data |> 
-  as_tibble() |> 
-  filter(!is.na(has.nematodes) & !is.na(morph)) |> 
-  mutate(residuals=residuals(mod_SMOD, type = "pearson")) |> 
-  group_by(x,y,Population) |> 
-  summarise(meanres=mean(residuals))
+groupLocations <- data |>
+  as_tibble() |>
+  filter(!is.na(has.nematodes) & !is.na(morph)) |>
+  mutate(residuals = residuals(mod_SMOD, type = "pearson")) |>
+  group_by(x, y, Population) |>
+  summarise(meanres = mean(residuals))
 
-correlog <- spline.correlog (x = groupLocations$x/1000, y = groupLocations$y/1000,
-                             z = groupLocations$meanres)
+correlog <- spline.correlog(
+  x = groupLocations$x / 1000, y = groupLocations$y / 1000,
+  z = groupLocations$meanres
+)
 
 plot(correlog) # no evidence of residual autocorrelation
 ```
@@ -280,11 +289,12 @@ We can move forward with our model then :)
 ```{r model-test}
 r.squaredGLMM(mod_SMOD)
 Anova(mod_SMOD)
+summary(mod_SMOD)
 
-contrast(emmeans(mod_SMOD,specs = ~ SMOD_type),method="pairwise")
+contrast(emmeans(mod_SMOD, specs = ~SMOD_type), method = "pairwise")
 
-preds <- emmeans(mod_SMOD,specs = ~ SMOD_type, type="response") |> 
-  as_tibble() 
+preds <- emmeans(mod_SMOD, specs = ~SMOD_type, type = "response") |>
+  as_tibble()
 
 preds
 ```
@@ -292,16 +302,16 @@ preds
 # Plot
 
 ```{r plot}
-aggregated_data <- data |> 
-  as_tibble() |> select(-geom) |> 
-  group_by(SMOD_type,Population) |>
-  summarise(N_nema=sum(has.nematodes,na.rm=TRUE),N=sum(!is.na(has.nematodes)))
+aggregated_data <- data |>
+  as_tibble() |>
+  select(-geom) |>
+  group_by(SMOD_type, Population) |>
+  summarise(N_nema = sum(has.nematodes, na.rm = TRUE), N = sum(!is.na(has.nematodes)))
 
-ggplot() + 
-  geom_point(data=aggregated_data,aes(SMOD_type,N_nema/N,size=N),position = position_jitter(width=0.3,height=0),col="darkgrey") + 
-  geom_pointrange(data = preds, aes(x=SMOD_type,y=prob,ymin=asymp.LCL,ymax=asymp.UCL),size=1,pch=21,fill="white")+ 
-  scale_size_area("Number of snails") + 
-  labs(x="Degree of Urbanisation (GHS-SMOD, 1km grid cell)", y = "Proportion of shells with nematodes")+
+ggplot() +
+  geom_point(data = aggregated_data, aes(SMOD_type, N_nema / N, size = N), position = position_jitter(width = 0.3, height = 0), col = "darkgrey") +
+  geom_pointrange(data = preds, aes(x = SMOD_type, y = prob, ymin = asymp.LCL, ymax = asymp.UCL), size = 1, pch = 21, fill = "white") +
+  scale_size_area("Number of snails") +
+  labs(x = "Degree of Urbanisation (GHS-SMOD, 1km grid cell)", y = "Proportion of shells with nematodes") +
   theme_bw()
 ```
-
