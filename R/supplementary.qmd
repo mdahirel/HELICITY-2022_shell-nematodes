@@ -2,6 +2,7 @@
 title: "_Cepaea nemoralis_ snails are less likely to trap nematodes within their shells in urban areas - supplementary material"
 author: "Maxime Dahirel, Hannah Reyné, Katrien De Wolf, Dries Bonte"
 bibliography: references.bib
+csl: peer-community-journal-pci_Zotero.csl
 format: pdf
 editor_options: 
   chunk_output_type: console
@@ -31,6 +32,7 @@ library(here) # CRAN v1.0.1
 #| output: false
 nematodes_raw <- read_csv(here("data", "HELICITY22_nematodes.csv"))
 colours_raw <- read_csv(here("data", "HELICITY22_shellcolours.csv"))
+size_raw <- read_csv(here("data", "HELICITY22_shellsize.csv"))
 
 points_raw <- st_read(here("data", "HELICITY22_sites_BELambert72_wGHSL.gpkg"))
 ```
@@ -115,6 +117,7 @@ ggplot(points) +
 #| output: false
 infected <- nematodes_raw |>
   left_join(colours_raw) |>
+  left_join(size_raw) |>
   left_join(points) |>
   filter(Nematodes > 0) |>
   mutate(Nematodes_minus_1 = Nematodes - 1) # so the test variable for count models stays bounded at 0
@@ -130,7 +133,10 @@ Using the subset of shells where nematodes were detected, we ran a negative bino
 #| echo: false
 #| message: false
 #| output: false
-mod <- glmmTMB(Nematodes_minus_1 ~ SMOD_type + City + col + scale(nbands) + fusion + (1 | Population), data = infected, family = poisson)
+mod <- glmmTMB(Nematodes_minus_1 ~ SMOD_type + City +
+  col + scale(nbands) + fusion + scale(Shell_size) +
+  (1 | Population),
+  data = infected, family = poisson)
 
 plot(simulateResiduals(mod))
 testDispersion(simulateResiduals(mod), alternative = "greater")
@@ -139,7 +145,10 @@ check_overdispersion(mod) # conflict between parametric and non parametric; let'
 ## NB: saving the performance::check_overdispersion() test as an object and exploring it with str() confirms it's the same as
 ## DHARMa::testDispersion(type="PearsonChisq",alternative="greater")
 
-mod <- glmmTMB(Nematodes_minus_1 ~ SMOD_type + City + col + scale(nbands) + fusion + (1 | Population), data = infected, family = nbinom2)
+mod <- glmmTMB(Nematodes_minus_1 ~ SMOD_type + City +
+  col + scale(nbands) + fusion + scale(Shell_size) +
+  (1 | Population),
+  data = infected, family = nbinom2)
 plot(simulateResiduals(mod))
 testDispersion(simulateResiduals(mod), alternative = "greater")
 testDispersion(simulateResiduals(mod), type = "PearsonChisq", alternative = "greater")
@@ -159,12 +168,13 @@ preds_infected <- emmeans(mod, specs = ~SMOD_type, type = "response") |>
 Anova(mod) |>
   as.data.frame() |>
   mutate(Chisq = round(Chisq, 2)) |>
-  rename(`$\\Chi^2$` = "Chisq", `_p_` = `Pr(>Chisq)`) |>
+  rename(`$\\chi^2$` = "Chisq", `_p_` = `Pr(>Chisq)`, df="Df") |>
   mutate(`_p_` = round(`_p_`, 2)) |>
   rownames_to_column(var = "variable") |>
   mutate(variable = case_when(
     variable == "SMOD_type" ~ "Degree of Urbanisation",
     variable == "City" ~ "City",
+    variable == "scale(Shell_size)" ~ "Shell size",
     variable == "col" ~ "Shell background colour",
     variable == "scale(nbands)" ~ "Number of bands",
     variable == "fusion" ~ "Band fusion"
