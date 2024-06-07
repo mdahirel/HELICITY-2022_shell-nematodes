@@ -61,7 +61,7 @@ The `points_raw` dataset is a geopackage containing the point locations for each
 - `Sampling_effort_minutes`: total sampling effort **in person-minutes** (i.e., a value of 30 here with `N_collectors`=2 means 2 people searched 15 min each)
 - `POP100`, `BUILT100`: the values of population density (`POP`) and built-up surface (`BUILT`) for the 100 x 100 m grid cell the point falls in, from the GHSL rasters (see main text Methods for references). **IMPORTANT**: these are _absolute_ (people, m^2^), not relative (people.km^-2^, % built).  
 - `POP1000`, `BUILT1000`: same as above, but using the 1000 m resolution rasters instead
-- `SMOD`: same as above, but for the 1000 m resolution SMOD/Degree of Urbanisation raster from the GHSL. This gives values at the finer level 2 of the Degree of Urbanisation classification (https://doi.org/10.2785/706535). We are going to use the coarser level 1 classification into (broadly) highly urban/intermediate/rural and process the data accordingly below.
+- `SMOD`: same as above, but for the 1000 m resolution SMOD/Degree of Urbanisation raster from the GHSL. This gives values at the finer level 2 of the Degree of Urbanization classification (https://doi.org/10.2785/706535). We are going to use the coarser level 1 classification into (broadly) highly urban/intermediate/rural and process the data accordingly below.
 
 # Processing data
 
@@ -164,7 +164,7 @@ We can now move to running the models.
 
 ## Models without size
 
-(these models are not used in the manuscript, and are here as an internal check that we get the same qualitative conclusions for urbanisation by including size vs not, despite size having one missing value _ see above_ and therefore reducing the dataset size by one if we include it in model)
+(these models are not used in the manuscript, and are here as an internal check that we get the same qualitative conclusions for urbanization by including size vs not, despite size having one missing value _ see above_ and therefore reducing the dataset size by one if we include it in model)
 
 ```{r models0}
 mod_built100_a <- glmmTMB(has.nematodes ~ scale(BUILT100) + City +
@@ -312,6 +312,6 @@ ggplot() +
   geom_point(data = aggregated_data, aes(SMOD_type, N_nema / N, size = N), position = position_jitter(width = 0.3, height = 0), col = "darkgrey") +
   geom_pointrange(data = preds, aes(x = SMOD_type, y = prob, ymin = asymp.LCL, ymax = asymp.UCL), size = 1, pch = 21, fill = "white") +
   scale_size_area("Number of snails") +
-  labs(x = "Degree of Urbanisation (GHS-SMOD, 1km grid cell)", y = "Proportion of shells with nematodes") +
+  labs(x = "Degree of Urbanization (GHS-SMOD, 1km grid cell)", y = "Proportion of shells with nematodes") +
   theme_bw()
 ```
