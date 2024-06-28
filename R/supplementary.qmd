@@ -18,6 +18,7 @@ library(DHARMa) # CRAN v0.4.6
 library(emmeans) # CRAN v1.10.0
 library(ggtext) # CRAN v0.1.2
 library(glmmTMB) # CRAN v1.1.8
+library(MuMIn) # CRAN v1.47.5
 library(performance) # CRAN v0.10.9
 library(sf) # CRAN v1.0-15
 
@@ -275,5 +276,148 @@ ggplot(data_size) +
 ```
 
 **Figure S3-2.** (left) Relationship between city (Functional Urban Area) of origin and snail shell size. Grey dots are observed values; white dots (and error bars) are estimated marginal means from the best model (and their 95% confidence intervals), with the effects of urbanization levels averaged out.
+
+# S4 - Potential interactions between urbanization and shell size
+
+Another way for urbanization to have complex indirect effects through size is that if the effect of shell size on nematode prevalence depends on urbanization, i.e. if there are interactions between the two.
+
+In this post-hoc analysis, we explored this possibility by re-running our model set, this time adding size $\times$ urbanization interactions to all models (except of course the "null" model with no urbanization effect).
+
+```{r s4-make-final-data}
+#| echo: false
+#| message: false
+#| warning: false
+
+tab <- nematodes_raw |>
+  left_join(colours_raw) |>
+  left_join(size_raw) |>
+  left_join(points) |>
+  mutate(has.nematodes = Nematodes > 0)
+
+data <- drop_na(tab)
+```
+
+```{r s4-models}
+#| echo: false
+#| message: false
+#| warning: false
+
+mod_built100i <- glmmTMB(has.nematodes ~ scale(BUILT100) * scale(Shell_size) + 
+                           City +
+                          col + scale(nbands) + fusion +
+                          (1 | Population), data = data, family = binomial)
+
+mod_built1000i <- glmmTMB(has.nematodes ~ scale(BUILT1000) * scale(Shell_size) + 
+                            City +
+                           col + scale(nbands) + fusion + 
+                           (1 | Population), data = data, family = binomial)
+
+mod_pop100i <- glmmTMB(has.nematodes ~ scale(POP100) * scale(Shell_size)  + 
+                         City +
+                        col + scale(nbands) + fusion +
+                        (1 | Population), data = data, family = binomial)
+
+mod_pop1000i <- glmmTMB(has.nematodes ~ scale(POP1000) * scale(Shell_size) + 
+                          City +
+                         col + scale(nbands) + fusion + 
+                         (1 | Population), data = data, family = binomial)
+
+mod_SMODi <- glmmTMB(has.nematodes ~ SMOD_type * scale(Shell_size) +
+                       City +
+                      col + scale(nbands) + fusion + 
+                      (1 | Population), data = data, family = binomial)
+
+mod_null <- glmmTMB(has.nematodes ~ City + col +
+                      scale(nbands) + fusion + scale(Shell_size) +
+                      (1 | Population), data = data, family = binomial)
+```
+
+```{r s4-summaries}
+#| echo: false
+#| message: false
+#| warning: false
+
+R2nakagawa <- r.squaredGLMM(mod_SMODi)
+anova2 <- Anova(mod_SMODi,type=2)
+anova3 <- Anova(mod_SMODi,type=3) 
+# we use type III in the text below but conclusions are similar for type II and type III
+
+contrasts <- contrast(emmeans(mod_SMODi, specs = ~SMOD_type), method = "pairwise") |> 
+  as.data.frame()
+preds <- emmeans(mod_SMODi, specs = ~SMOD_type, type = "response") |>
+  as_tibble()
+```
+
+The model using the categorical Degree of Urbanization (GHS-SMOD) again outperformed all other models based on AICc (**Table S4-1**). In this model, fixed effects and random effects again accounted for similar amounts of variance ($R^2_m$ = `r round(R2nakagawa["delta","R2m"],2)`; $R^2_c$ = `r format(round(R2nakagawa["delta","R2c"],2), nsmall = 2)`). 
+
+There was no significant size $\times$ urbanization interaction ($\chi^2$ = `r round(anova3["SMOD_type:scale(Shell_size)","Chisq"],2)`, df = `r round(anova3["SMOD_type:scale(Shell_size)","Df"],2)`, *p* = `r round(anova3["SMOD_type:scale(Shell_size)","Pr(>Chisq)"],2)`).
+
+The probability that a shell contained trapped nematodes was still dependent on urbanization level ($\chi^2$ = `r round(anova3["SMOD_type","Chisq"],2)`, df = `r round(anova3["SMOD_type","Df"],2)`, *p* = `r formatC(anova3["SMOD_type","Pr(>Chisq)"],format="e",digits=2) |> str_replace("e-04"," × 10^-4^")`). The predicted values for each urbanization level were nearly identical to those obtained from the original model in the main text (**Fig. S4-1**; rural - intermediate difference on the logit scale ± SE: `r round(contrasts$estimate[which(contrasts$contrast=="(1 - Rural) - (2 - Intermediate)")],2)` ± `r round(contrasts$SE[which(contrasts$contrast=="(1 - Rural) - (2 - Intermediate)")],2)` ; rural - Urban Centre difference: `r round(contrasts$estimate[which(contrasts$contrast=="(1 - Rural) - (3 - Urban Centre)")],2)` ± `r round(contrasts$SE[which(contrasts$contrast=="(1 - Rural) - (3 - Urban Centre)")],2)`). 
+
+Importantly, with the addition of the (non-significant) size $\times$ urbanization interaction, the main effect of shell size itself became non-significant too ($\chi^2$ = `r round(anova3["scale(Shell_size)","Chisq"],2)`, df = `r round(anova3["scale(Shell_size)","Df"],2)`, *p* = `r round(anova3["scale(Shell_size)","Pr(>Chisq)"],2)`). The other effects that were initially non-significant remained so (city: $\chi^2$ = `r round(anova3["City","Chisq"],2)`, df = `r round(anova3["City","Df"],2)`, *p* = `r round(anova3["City","Pr(>Chisq)"],2)`; background colour: $\chi^2$ = `r round(anova3["col","Chisq"],2)`, df = `r round(anova3["col","Df"],2)`, *p* = `r round(anova3["col","Pr(>Chisq)"],2)`; band number: $\chi^2$ = `r round(anova3["scale(nbands)","Chisq"],2)`, df = `r round(anova3["scale(nbands)","Df"],2)`, *p* = `r format(round(anova3["scale(nbands)","Pr(>Chisq)"],2),nsmall=2)` ; fusion: $\chi^2$ = `r round(anova3["fusion","Chisq"],2)`, df = `r round(anova3["fusion","Df"],2)`, *p* = `r round(anova3["fusion","Pr(>Chisq)"],2)`).
+
+**Table S4-1.** Model selection table for the effect of urbanization on shell encapsulation rates, for the modified model set with size $\times$ urbanization interactions added. As in the main text, all models otherwise include effects of city identity, shell size and shell morph (background colour, number of bands and band fusion).
+
+```{r s4-table1}
+#| echo: false
+#| message: false
+#| warning: false
+
+mtablei <- model.sel(mod_built100i, mod_built1000i, mod_pop100i, 
+                     mod_pop1000i, mod_SMODi, mod_null, rank = "AICc")
+
+tibble(
+  `Urbanization variable in model` = row.names(mtablei),
+  df = mtablei$df,
+  `log-likelihood` = round(mtablei$logLik, 1),
+  AICc = round(mtablei$AICc, 1),
+  `$\\Delta$` = round(mtablei$delta, 2),
+  `AICc weight` = round(mtablei$weight, 2)
+) |>
+  mutate(
+    `Urbanization variable in model` =case_when(
+      `Urbanization variable in model`=="mod_SMODi"~
+        "Degree of Urbanization categories (SMOD, 1000 m resolution grid)",
+      `Urbanization variable in model`=="mod_pop1000i" ~ 
+        "Population density (1000 m resolution grid)",
+      `Urbanization variable in model`== "mod_null" ~
+        "None (“null” model)",
+      `Urbanization variable in model`== "mod_built1000i" ~
+        "Built-up surface (1000 m resolution grid)",
+      `Urbanization variable in model`== "mod_built100i" ~
+        "Built-up surface (1000 m resolution grid)",
+      `Urbanization variable in model`== "mod_pop100i" ~
+        "Population density (100 m resolution grid)",
+      TRUE~NA_character_
+    )
+  ) |> 
+  knitr::kable()
+
+```
+
+```{r s4-fig1}
+#| echo: false
+#| message: false
+#| warning: false
+
+aggregated_data <- data |>
+  as_tibble() |>
+  select(-geom) |>
+  group_by(SMOD_type, Population) |>
+  summarise(N_nema = sum(has.nematodes, na.rm = TRUE), N = sum(!is.na(has.nematodes)))
+
+ggplot() +
+  geom_point(data = aggregated_data, aes(SMOD_type, N_nema / N, size = N), 
+             position = position_jitter(width = 0.3, height = 0), col = "darkgrey") +
+  geom_pointrange(data = preds, 
+                  aes(x = SMOD_type, y = prob, ymin = asymp.LCL, ymax = asymp.UCL), 
+                  size = 1, pch = 21, fill = "white") +
+  scale_size_area("Number of snails") +
+  labs(x = "Degree of Urbanization (GHS-SMOD, 1km grid cell)",
+       y = "Proportion of shells with nematodes") +
+  theme_bw()
+```
+
+**Figure S4-1.** Effect of the Degree of Urbanization in 1000 m grid cells on the probability a snail shell contained encapsulated nematodes, based on the modified model with size $\times$ urbanization interactions added. Grey dots are observed proportions per population, with the size of the dot proportional to the number of snails; white dots (and error bars) are estimated marginal means from the best model (and their 95% confidence intervals), with the effects of the other predictors averaged out.
 
 # References
