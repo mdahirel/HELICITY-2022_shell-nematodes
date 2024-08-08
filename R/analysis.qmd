@@ -315,3 +315,19 @@ ggplot() +
   labs(x = "Degree of Urbanization (GHS-SMOD, 1km grid cell)", y = "Proportion of shells with nematodes") +
   theme_bw()
 ```
+
+# A note
+
+In the figure above, one can see that the urban sites are more variable than the other groups, with some very high values. While it is likely in part or all due to sampling variability (these urban sites with the high % have all very low sample size), it has been suggested during the review process that this could be due to within class variability that we can measure. 
+
+A way to explore that would be to re-run our previous models, but only using the Urban Centre subset of data, and adding one of the other continuous urbanization variables to see if it has an effect:
+
+```{r exploring-variability}
+modtest <- glmmTMB(has.nematodes ~ POP1000 + City +
+  col + scale(nbands) + fusion + scale(Shell_size) +
+  (1 | Population), data = data |> filter(SMOD_type=="3 - Urban Centre"), family = binomial)
+
+Anova(modtest)
+```
+
+No effect detectable in this example (this can be rerun replacing `POP1000` with `POP100` or the `BUILT` variables instead, and the result is the same). We do note that doing this subset analysis is essentially cutting in half our dataset, with an expected loss of power in turn. So these should not be seen as conclusive of an absence of explainable within-class variability, but only signals we may not have enough information to conclude.
