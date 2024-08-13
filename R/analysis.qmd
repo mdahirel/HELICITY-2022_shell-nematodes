@@ -84,7 +84,7 @@ points <- points_raw |>
   )
 ```
 
-(Sidenote: in case of any issue with the geopackage file, an alternative version of the `points_raw` dataset containing exactly the same tabular data, along with explicit coordinate fields in lat/lon and x/y formats, is also available. In which case, you can run the following chunk of code to re-generate the `points` table)
+(Sidenote: in case of any issue with the geopackage file, an alternative csv version of the `points_raw` dataset containing exactly the same tabular site data, along with column coordinate fields in lat/lon and x/y formats, is also available. In which case, you can un-comment out and run the following chunk of code to re-generate the correct `points` table)
 
 ```{r points_alt}
 #points <- read_csv(here("data", "HELICITY22_sitesdata_converted_from_gpkg.csv")) |>
@@ -97,6 +97,7 @@ points <- points_raw |>
 #    T ~ NA_character_
 #  )) |>
 #  st_as_sf(coords = c("xcoord", "ycoord"), crs = st_crs(31370))
+#st_geometry(points) <- "geom" #rename geometry for consistency with gpkg-based method
 ```
 
 
@@ -320,7 +321,7 @@ preds
 ```{r plot}
 aggregated_data <- data |>
   as_tibble() |>
-  select(-geom) |> #NB: select(-geometry) if using the csv version of points_raw (cf supra)
+  select(-geom) |>
   group_by(SMOD_type, Population) |>
   summarise(N_nema = sum(has.nematodes, na.rm = TRUE), N = sum(!is.na(has.nematodes)))
 
