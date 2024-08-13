@@ -84,13 +84,29 @@ points <- points_raw |>
   )
 ```
 
+(Sidenote: in case of any issue with the geopackage file, an alternative version of the `points_raw` dataset containing exactly the same tabular data, along with explicit coordinate fields in lat/lon and x/y formats, is also available. In which case, you can run the following chunk of code to re-generate the `points` table)
+
+```{r points_alt}
+#points <- read_csv(here("data", "HELICITY22_sitesdata_converted_from_gpkg.csv")) |>
+#  mutate(x = "xcoord", y = "ycoord") |>
+#  mutate(SMOD_type = case_when(
+#    SMOD == 30 ~ "3 - Urban Centre",
+#    (SMOD >= 20 & SMOD < 30) ~ "2 - Intermediate",
+#    (SMOD > 10 & SMOD < 20) ~ "1 - Rural",
+#    SMOD == 10 ~ "0 - Water bodies",
+#    T ~ NA_character_
+#  )) |>
+#  st_as_sf(coords = c("xcoord", "ycoord"), crs = st_crs(31370))
+```
+
+
 We then combine that with the other datasets:
 
 ```{r make_final-data1}
 tab <- nematodes_raw |>
   left_join(colours_raw) |>
   left_join(size_raw) |>
-  left_join(points) |>
+  left_join(points2) |>
   mutate(has.nematodes = Nematodes > 0)
 ```
 
