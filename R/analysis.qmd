@@ -88,7 +88,7 @@ points <- points_raw |>
 
 ```{r points_alt}
 #points <- read_csv(here("data", "HELICITY22_sitesdata_converted_from_gpkg.csv")) |>
-#  mutate(x = "xcoord", y = "ycoord") |>
+#  mutate(x = xcoord, y = ycoord) |>
 #  mutate(SMOD_type = case_when(
 #    SMOD == 30 ~ "3 - Urban Centre",
 #    (SMOD >= 20 & SMOD < 30) ~ "2 - Intermediate",
@@ -106,7 +106,7 @@ We then combine that with the other datasets:
 tab <- nematodes_raw |>
   left_join(colours_raw) |>
   left_join(size_raw) |>
-  left_join(points2) |>
+  left_join(points) |>
   mutate(has.nematodes = Nematodes > 0)
 ```
 
@@ -320,7 +320,7 @@ preds
 ```{r plot}
 aggregated_data <- data |>
   as_tibble() |>
-  select(-geom) |>
+  select(-geom) |> #NB: select(-geometry) if using the csv version of points_raw (cf supra)
   group_by(SMOD_type, Population) |>
   summarise(N_nema = sum(has.nematodes, na.rm = TRUE), N = sum(!is.na(has.nematodes)))
 
