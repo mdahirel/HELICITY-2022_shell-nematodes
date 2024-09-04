@@ -6,6 +6,7 @@ This repository contains all data and code needed to re-do the analyses and figu
 
 "Urban _Cepaea nemoralis_ snails are less likely to have nematodes trapped within their shells" (by Maxime Dahirel, Hannah Reyné, Katrien De Wolf and Dries Bonte)
 
-link to preprint: https://doi.org/10.1101/2024.03.07.583959
+link to preprint: https://doi.org/10.1101/2024.03.07.583959  
+link to published version in _Peer Community Journal_: https://doi.org/10.24072/pcjournal.463
 
 This folder is a RStudio project folder, and the script uses the `here` package (see also [here](https://github.com/jennybc/here_here)) to further ensure all files paths are relative.
